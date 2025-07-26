@@ -8,9 +8,7 @@ public class Hareket : MonoBehaviour
     public float MaxHizDegisimi = 10f;
     public float kosmaHiz = 6f;
 
-
     MyLibrary animasyon = new MyLibrary();
-
 
     public float airControl = 0.5f;
     public float ziplamaSiniri = 4f;
@@ -24,92 +22,56 @@ public class Hareket : MonoBehaviour
     private bool isRunning;
     private bool isJumping;
     private bool isGrounded;
+    private bool isCrouching;
 
-    Vector2 ýnput;
+    Vector2 input;
+
     void Start()
     {
         rb = GetComponent<Rigidbody>();
         anim = GetComponent<Animator>();
-        
     }
 
-   
     void Update()
     {
-        ýnput = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
-        ýnput.Normalize();
+        input = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
+        input.Normalize();
 
         isRunning = Input.GetKey(KeyCode.LeftShift);
-        if (Input.GetButtonDown("Jump") && isGrounded)
+        isCrouching = Input.GetKey(KeyCode.LeftControl);
+
+        if (Input.GetButtonDown("Jump") && isGrounded && !isCrouching)
         {
             isJumping = true;
         }
-
     }
 
-    private void LateUpdate()
+    private void FixedUpdate()
     {
-        if (Input.GetKey(KeyCode.W))
-        {
-            if (isRunning) // Koþma
-            {
-                float newSpeed = isRunning ? 1.0f : 0.2f;
-                anim.SetFloat("speed", Mathf.Lerp(anim.GetFloat("speed"), newSpeed, Time.deltaTime * 10f));
-            }
-            else // Yürüme
-                anim.SetFloat("speed", 0.1f);
-        }
-        else
-        {
-            anim.SetFloat("speed", 0); // Durma
-        }
-
-        animasyon.Sol_Hareket(anim, "solHareket", animasyon.ParamtereOlustur(Sol_Yon_Parametreleri));
-        animasyon.Sag_Hareket(anim, "sagHareket", animasyon.ParamtereOlustur(Sag_Yon_Parametreleri));
-        animasyon.Geri_Hareket(anim, "geri");
-
-        // **Eðilme animasyonu çaðrýlýrken hýz azaltýlýyor**
-        animasyon.Egilme_Hareket(anim, "egilmeHareket", animasyon.ParamtereOlustur(Egilme_Yon_Parametreleri), ref hareketHiz);
-
-
-
-
         if (isGrounded)
         {
             if (isJumping)
             {
                 rb.linearVelocity = new Vector3(rb.linearVelocity.x, ziplamaSiniri, rb.linearVelocity.z);
             }
-            else if (ýnput.magnitude > 0.5f)
+            else if (input.magnitude > 0.1f)
             {
-
-                rb.AddForce(hareketHesapla(isRunning ? kosmaHiz : hareketHiz), ForceMode.VelocityChange);
-                
+                float currentSpeed = isRunning ? kosmaHiz : (isCrouching ? hareketHiz * 0.5f : hareketHiz);
+                Vector3 hareket = hareketHesapla(currentSpeed);
+                rb.AddForce(hareket, ForceMode.VelocityChange);
             }
             else
             {
-               
-
-                var velocity1 = rb.linearVelocity;
-                velocity1 = new Vector3(velocity1.x * 0.2f * Time.fixedDeltaTime, velocity1.y, velocity1.z * 0.2f * Time.fixedDeltaTime); // Y eksenindeki h?z? s?f?rla
-                rb.linearVelocity = velocity1;
-                anim.SetFloat("speed", 0.0f);
-
+                rb.linearVelocity = new Vector3(rb.linearVelocity.x * 0.2f, rb.linearVelocity.y, rb.linearVelocity.z * 0.2f);
             }
-
         }
         else
         {
-            if (ýnput.magnitude > 0.5f)
+            if (input.magnitude > 0.1f)
             {
-                rb.AddForce(hareketHesapla(isRunning ? kosmaHiz * airControl : hareketHiz * airControl), ForceMode.VelocityChange);
-
-            }
-            else
-            {
-                var velocity1 = rb.linearVelocity;
-                velocity1 = new Vector3(velocity1.x * 0.2f * Time.fixedDeltaTime, velocity1.y, velocity1.z * 0.2f * Time.fixedDeltaTime); // Y eksenindeki h?z? s?f?rla
-                rb.linearVelocity = velocity1;
+                float airSpeed = isRunning ? kosmaHiz * airControl : hareketHiz * airControl;
+                Vector3 hareket = hareketHesapla(airSpeed);
+                rb.AddForce(hareket, ForceMode.VelocityChange);
             }
         }
 
@@ -117,40 +79,42 @@ public class Hareket : MonoBehaviour
         isJumping = false;
     }
 
-
-
-
-
-    private void OnTriggerStay(Collider other)
+    private void LateUpdate()
     {
-        /*if (pv == null) return; // Bu satýrý ekle
-        if (!pv.IsMine) return;*/
-        isGrounded = true;
-    }
-
-    Vector3 hareketHesapla(float _hiz)
-    {
-        Vector3 hedefHiz = new Vector3(ýnput.x, 0, ýnput.y);
-        hedefHiz = transform.TransformDirection(hedefHiz);
-
-        hedefHiz *= _hiz;
-
-        Vector3 hiz = rb.linearVelocity;
-
-        if (ýnput.magnitude > 0.5f)
+        float hedefHiz = isRunning ? 1.0f : 0.2f;
+        if (Input.GetKey(KeyCode.W) && !Input.GetKey(KeyCode.A) && !Input.GetKey(KeyCode.D))
         {
-            Vector3 hizFarki = hedefHiz - hiz;
-            hizFarki.x = Mathf.Clamp(hizFarki.x, -MaxHizDegisimi, MaxHizDegisimi);
-            hizFarki.z = Mathf.Clamp(hizFarki.z, -MaxHizDegisimi, MaxHizDegisimi);
-
-            hizFarki.y = 0f; // Y eksenindeki h?z? s?f?rla
-
-            return (hizFarki);
+            float hiz = isCrouching ? 0.1f : (isRunning ? 1f : 0.2f);
+            anim.SetFloat("speed", Mathf.Lerp(anim.GetFloat("speed"), hiz, Time.deltaTime * 10f));
         }
         else
         {
-            return new Vector3();
+            anim.SetFloat("speed", 0);
         }
+
+        animasyon.Sol_Hareket(anim, "solHareket", animasyon.ParamtereOlustur(Sol_Yon_Parametreleri));
+        animasyon.Sag_Hareket(anim, "sagHareket", animasyon.ParamtereOlustur(Sag_Yon_Parametreleri));
+        animasyon.Geri_Hareket(anim, "geri");
+        animasyon.Egilme_Hareket(anim, "egilmeHareket", animasyon.ParamtereOlustur(Egilme_Yon_Parametreleri));
     }
 
+    private void OnTriggerStay(Collider other)
+    {
+        isGrounded = true;
+    }
+
+    Vector3 hareketHesapla(float hiz)
+    {
+        Vector3 hedefHiz = new Vector3(input.x, 0, input.y);
+        hedefHiz = transform.TransformDirection(hedefHiz);
+        hedefHiz *= hiz;
+
+        Vector3 mevcutHiz = rb.linearVelocity;
+        Vector3 hizFarki = hedefHiz - mevcutHiz;
+        hizFarki.x = Mathf.Clamp(hizFarki.x, -MaxHizDegisimi, MaxHizDegisimi);
+        hizFarki.z = Mathf.Clamp(hizFarki.z, -MaxHizDegisimi, MaxHizDegisimi);
+        hizFarki.y = 0f;
+
+        return hizFarki;
+    }
 }

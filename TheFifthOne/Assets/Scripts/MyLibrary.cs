@@ -73,26 +73,26 @@ public class MyLibrary
         }
 
         public void Egilme_Hareket(Animator anim, string AnaParatme,
-             List<float> ParametreDegerleri, ref float currentSpeed)
+             List<float> ParametreDegerleri)
         {
             if (Input.GetKey(KeyCode.LeftControl))
             {
-                currentSpeed *= 0.5f;
+                
                 if (Input.GetKey(KeyCode.W))
                 {
-                    anim.SetFloat(AnaParatme, ParametreDegerleri[1]);
+                    anim.SetFloat(AnaParatme, Mathf.Lerp(anim.GetFloat(AnaParatme), ParametreDegerleri[1], Time.deltaTime * 10f));
                 }
                 else if (Input.GetKey(KeyCode.S))
                 {
-                    anim.SetFloat(AnaParatme, ParametreDegerleri[2]);
+                    anim.SetFloat(AnaParatme, Mathf.Lerp(anim.GetFloat(AnaParatme), ParametreDegerleri[2], Time.deltaTime * 10f));
                 }
                 else if (Input.GetKey(KeyCode.A))
                 {
-                    anim.SetFloat(AnaParatme, ParametreDegerleri[3]);
+                    anim.SetFloat(AnaParatme, Mathf.Lerp(anim.GetFloat(AnaParatme), ParametreDegerleri[3], Time.deltaTime * 10f));
                 }
                 else if (Input.GetKey(KeyCode.D))
                 {
-                    anim.SetFloat(AnaParatme, ParametreDegerleri[4]);
+                    anim.SetFloat(AnaParatme, Mathf.Lerp(anim.GetFloat(AnaParatme), ParametreDegerleri[4], Time.deltaTime * 10f));
                 }
                 else
                 {
@@ -102,9 +102,9 @@ public class MyLibrary
 
             if (Input.GetKeyUp(KeyCode.LeftControl))
             {
-                currentSpeed *= 1f;
                 anim.SetFloat(AnaParatme, 0);
             }
+
         }
 
         public List<float> ParamtereOlustur(float[] parametre)
