@@ -39,6 +39,15 @@ public class Hareket : MonoBehaviour
 
         isRunning = Input.GetKey(KeyCode.LeftShift);
         isCrouching = Input.GetKey(KeyCode.LeftControl);
+        if(
+            Input.GetKeyDown(KeyCode.LeftControl) && !isCrouching)
+        {
+            anim.SetBool("isCrouching", true);
+        }
+        else if (Input.GetKeyUp(KeyCode.LeftControl) && isCrouching)
+        {
+            anim.SetBool("isCrouching", false);
+        }
 
         if (Input.GetButtonDown("Jump") && isGrounded && !isCrouching)
         {
