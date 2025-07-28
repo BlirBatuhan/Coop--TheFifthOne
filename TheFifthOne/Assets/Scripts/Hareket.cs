@@ -1,118 +1,133 @@
+using Fusion;
 using UnityEngine;
 using Kutuphanem;
 
-public class Hareket : MonoBehaviour
+public class Hareket : NetworkBehaviour
 {
     private Rigidbody rb;
+    private Animator anim;
+
+    [Header("Hareket Ayarlarý")]
     public float hareketHiz = 4f;
     public float MaxHizDegisimi = 10f;
     public float kosmaHiz = 6f;
-
-    MyLibrary animasyon = new MyLibrary();
-
     public float airControl = 0.5f;
     public float ziplamaSiniri = 4f;
 
-    [Header("Animator Settings")]
-    private Animator anim;
+    [Header("Animator Ayarlarý")]
+    MyLibrary animasyon = new MyLibrary();
     float[] Sol_Yon_Parametreleri = { 0.15f, 0.5f, 1 };
     float[] Sag_Yon_Parametreleri = { 0.15f, 0.5f, 1 };
     float[] Egilme_Yon_Parametreleri = { 0.15f, 0.25f, 0.50f, 0.75f, 1f };
 
+    private bool isGrounded;
+
+    private Vector2 input;
     private bool isRunning;
     private bool isJumping;
-    private bool isGrounded;
     private bool isCrouching;
+    private bool isAnim;
 
-    Vector2 input;
-
-    void Start()
+    public override void Spawned()
     {
         rb = GetComponent<Rigidbody>();
         anim = GetComponent<Animator>();
     }
 
-    void Update()
+    public override void FixedUpdateNetwork()
     {
-        input = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
-        input.Normalize();
 
-        isRunning = Input.GetKey(KeyCode.LeftShift);
-        isCrouching = Input.GetKey(KeyCode.LeftControl);
-        if(
-            Input.GetKeyDown(KeyCode.LeftControl) && !isCrouching)
-        {
-            anim.SetBool("isCrouching", true);
-        }
-        else if (Input.GetKeyUp(KeyCode.LeftControl) && isCrouching)
-        {
-            anim.SetBool("isCrouching", false);
-        }
+        if (!Object.HasInputAuthority)
+            return;
 
-        if (Input.GetButtonDown("Jump") && isGrounded && !isCrouching)
+        if (GetInput<NetworkInputData>(out var data))
         {
-            isJumping = true;
-        }
-    }
+            input = data.move.normalized;
+            isRunning = data.run;
+            isCrouching = data.crouch;
+            isJumping = data.jump;
+            isAnim = data.isanim;
 
-    private void FixedUpdate()
-    {
-        if (isGrounded)
-        {
-            if (isJumping)
+            // Animasyon güncelleme
+            animasyon.Sol_Hareket(anim, "solHareket", animasyon.ParamtereOlustur(Sol_Yon_Parametreleri), data);
+            animasyon.Sag_Hareket(anim, "sagHareket", animasyon.ParamtereOlustur(Sag_Yon_Parametreleri), data);
+            animasyon.Geri_Hareket(anim, "geri", data);
+            animasyon.Egilme_Hareket(anim, "egilmeHareket", animasyon.ParamtereOlustur(Egilme_Yon_Parametreleri), data);
+
+
+            if (data.move.y > 0.1f)
             {
-                rb.linearVelocity = new Vector3(rb.linearVelocity.x, ziplamaSiniri, rb.linearVelocity.z);
-            }
-            else if (input.magnitude > 0.1f)
-            {
-                float currentSpeed = isRunning ? kosmaHiz : (isCrouching ? hareketHiz * 0.5f : hareketHiz);
-                Vector3 hareket = hareketHesapla(currentSpeed);
-                rb.AddForce(hareket, ForceMode.VelocityChange);
+                float hiz = isCrouching ? 0.1f : (isRunning ? 1f : 0.2f);
+                anim.SetFloat("speed", Mathf.Lerp(anim.GetFloat("speed"), hiz, Time.deltaTime * 10f));
             }
             else
             {
-                rb.linearVelocity = new Vector3(rb.linearVelocity.x * 0.2f, rb.linearVelocity.y, rb.linearVelocity.z * 0.2f);
+                anim.SetFloat("speed", 0);
             }
-        }
-        else
-        {
-            if (input.magnitude > 0.1f)
+
+
+
+
+
+            float speed = isRunning ? kosmaHiz : (isCrouching ? hareketHiz * 0.5f : hareketHiz);
+
+            if (isGrounded)
             {
-                float airSpeed = isRunning ? kosmaHiz * airControl : hareketHiz * airControl;
+                if (isJumping)
+                {
+                    rb.linearVelocity = new Vector3(rb.linearVelocity.x, ziplamaSiniri, rb.linearVelocity.z);
+                }
+                else if (input.magnitude > 0.1f)
+                {
+                    Vector3 hareket = hareketHesapla(speed);
+                    rb.AddForce(hareket, ForceMode.VelocityChange);
+                }
+                else
+                {
+                    rb.linearVelocity = new Vector3(rb.linearVelocity.x * 0.2f, rb.linearVelocity.y, rb.linearVelocity.z * 0.2f);
+                }
+            }
+            else
+            {
+                float airSpeed = speed * airControl;
                 Vector3 hareket = hareketHesapla(airSpeed);
                 rb.AddForce(hareket, ForceMode.VelocityChange);
             }
-        }
 
-        isGrounded = false;
-        isJumping = false;
+            isJumping = false;
+            isGrounded = false;
+        }
     }
 
-    private void LateUpdate()
+
+  /*private void LateUpdate()
     {
-        float hedefHiz = isRunning ? 1.0f : 0.2f;
-        if (Input.GetKey(KeyCode.W) && !Input.GetKey(KeyCode.A) && !Input.GetKey(KeyCode.D))
+        if (!Object.HasInputAuthority)
+            return;
+
+
+        if (GetInput<NetworkInputData>(out var data))
         {
-            float hiz = isCrouching ? 0.1f : (isRunning ? 1f : 0.2f);
-            anim.SetFloat("speed", Mathf.Lerp(anim.GetFloat("speed"), hiz, Time.deltaTime * 10f));
+            float hedefHiz = isRunning ? 1.0f : 0.2f;
+
+            if (data.move.y > 0.1f && Mathf.Abs(data.move.x) < 0.1f)
+            {
+                float hiz = isCrouching ? 0.1f : (isRunning ? 1f : 0.2f);
+                anim.SetFloat("speed", Mathf.Lerp(anim.GetFloat("speed"), hiz, Time.deltaTime * 10f));
+            }
+            else
+            {
+                anim.SetFloat("speed", Mathf.Lerp(anim.GetFloat("speed"), 0f, Time.deltaTime * 10f));
+            }
+
+            animasyon.Sol_Hareket(anim, "solHareket", animasyon.ParamtereOlustur(Sol_Yon_Parametreleri), data);
+            animasyon.Sag_Hareket(anim, "sagHareket", animasyon.ParamtereOlustur(Sag_Yon_Parametreleri), data);
+            animasyon.Geri_Hareket(anim, "geri", data);
+            animasyon.Egilme_Hareket(anim, "egilmeHareket", animasyon.ParamtereOlustur(Egilme_Yon_Parametreleri), data);
         }
-        else
-        {
-            anim.SetFloat("speed", 0);
-        }
+    }*/
 
-        animasyon.Sol_Hareket(anim, "solHareket", animasyon.ParamtereOlustur(Sol_Yon_Parametreleri));
-        animasyon.Sag_Hareket(anim, "sagHareket", animasyon.ParamtereOlustur(Sag_Yon_Parametreleri));
-        animasyon.Geri_Hareket(anim, "geri");
-        animasyon.Egilme_Hareket(anim, "egilmeHareket", animasyon.ParamtereOlustur(Egilme_Yon_Parametreleri));
-    }
-
-    private void OnTriggerStay(Collider other)
-    {
-        isGrounded = true;
-    }
-
-    Vector3 hareketHesapla(float hiz)
+    private Vector3 hareketHesapla(float hiz)
     {
         Vector3 hedefHiz = new Vector3(input.x, 0, input.y);
         hedefHiz = transform.TransformDirection(hedefHiz);
@@ -125,5 +140,10 @@ public class Hareket : MonoBehaviour
         hizFarki.y = 0f;
 
         return hizFarki;
+    }
+
+    private void OnTriggerStay(Collider other)
+    {
+        isGrounded = true;
     }
 }

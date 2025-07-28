@@ -1,96 +1,93 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-
-
-namespace Kutuphanem { 
-public class MyLibrary 
+namespace Kutuphanem
 {
+    public class MyLibrary
+    {
+        // Sol hareket animasyonu - artýk doðrudan input verisini alýyoruz
         public void Sol_Hareket(Animator anim, string AnaParatme,
-               List<float> ParametreDegerleri)
+               List<float> ParametreDegerleri, NetworkInputData inputData)
         {
-            if (Input.GetKey(KeyCode.A))
+            if (inputData.move.x < -0.1f) // sola hareket var mý
             {
-               
-                if (Input.GetKey(KeyCode.W)) // Sadece W+A ise
+                if (inputData.move.y > 0.1f) // W+A
                 {
                     anim.SetFloat(AnaParatme, ParametreDegerleri[1]);
                 }
-                else if (Input.GetKey(KeyCode.S)) // Geri giderken sola bas?l?ysa
+                else if (inputData.move.y < -0.1f) // S+A
                 {
                     anim.SetFloat(AnaParatme, ParametreDegerleri[2]);
                 }
-                else // Sadece sola hareket
+                else // sadece sola
                 {
                     anim.SetFloat(AnaParatme, ParametreDegerleri[0]);
                 }
             }
-
-            if (Input.GetKeyUp(KeyCode.A))
+            else
             {
                 anim.SetFloat(AnaParatme, 0);
             }
         }
 
+        // Sað hareket animasyonu
         public void Sag_Hareket(Animator anim, string AnaParatme,
-             List<float> ParametreDegerleri)
+             List<float> ParametreDegerleri, NetworkInputData inputData)
         {
-            if (Input.GetKey(KeyCode.D))
+            if (inputData.move.x > 0.1f) // saða hareket var mý
             {
-                
-                if (Input.GetKey(KeyCode.W)) // Sadece W+D ise
+                if (inputData.move.y > 0.1f) // W+D
                 {
                     anim.SetFloat(AnaParatme, ParametreDegerleri[1]);
                 }
-                else if (Input.GetKey(KeyCode.S)) // Geri giderken sola bas?l?ysa
+                else if (inputData.move.y < -0.1f) // S+D
                 {
                     anim.SetFloat(AnaParatme, ParametreDegerleri[2]);
                 }
-                else // Sadece sola hareket
+                else // sadece saða
                 {
                     anim.SetFloat(AnaParatme, ParametreDegerleri[0]);
                 }
             }
-
-            if (Input.GetKeyUp(KeyCode.D))
+            else
             {
                 anim.SetFloat(AnaParatme, 0);
             }
         }
 
-        public void Geri_Hareket(Animator anim, string AnaParatme)
+        // Geri hareket animasyonu
+        public void Geri_Hareket(Animator anim, string AnaParatme, NetworkInputData inputData)
         {
-            if (Input.GetKeyDown(KeyCode.S))
+            if (inputData.move.y < -0.1f) // geri hareket var mý
             {
                 anim.SetFloat("speed", 0);
                 anim.SetBool(AnaParatme, true);
             }
-
-            if (Input.GetKeyUp(KeyCode.S))
+            else
             {
                 anim.SetBool(AnaParatme, false);
             }
         }
 
+        // Eðilme animasyonu
         public void Egilme_Hareket(Animator anim, string AnaParatme,
-             List<float> ParametreDegerleri)
+             List<float> ParametreDegerleri, NetworkInputData inputData)
         {
-            if (Input.GetKey(KeyCode.LeftControl))
+            if (inputData.crouch) // eðilme tuþu aktif mi
             {
-                
-                if (Input.GetKey(KeyCode.W))
+                if (inputData.move.y > 0.1f)
                 {
                     anim.SetFloat(AnaParatme, Mathf.Lerp(anim.GetFloat(AnaParatme), ParametreDegerleri[1], Time.deltaTime * 10f));
                 }
-                else if (Input.GetKey(KeyCode.S))
+                else if (inputData.move.y < -0.1f)
                 {
                     anim.SetFloat(AnaParatme, Mathf.Lerp(anim.GetFloat(AnaParatme), ParametreDegerleri[2], Time.deltaTime * 10f));
                 }
-                else if (Input.GetKey(KeyCode.A))
+                else if (inputData.move.x < -0.1f)
                 {
                     anim.SetFloat(AnaParatme, Mathf.Lerp(anim.GetFloat(AnaParatme), ParametreDegerleri[3], Time.deltaTime * 10f));
                 }
-                else if (Input.GetKey(KeyCode.D))
+                else if (inputData.move.x > 0.1f)
                 {
                     anim.SetFloat(AnaParatme, Mathf.Lerp(anim.GetFloat(AnaParatme), ParametreDegerleri[4], Time.deltaTime * 10f));
                 }
@@ -99,12 +96,10 @@ public class MyLibrary
                     anim.SetFloat(AnaParatme, ParametreDegerleri[0]);
                 }
             }
-
-            if (Input.GetKeyUp(KeyCode.LeftControl))
+            else
             {
                 anim.SetFloat(AnaParatme, 0);
             }
-
         }
 
         public List<float> ParamtereOlustur(float[] parametre)
@@ -116,6 +111,5 @@ public class MyLibrary
             }
             return Yon_Parametreleri;
         }
-    
-}
+    }
 }

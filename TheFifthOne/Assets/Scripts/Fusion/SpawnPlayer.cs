@@ -77,6 +77,18 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
 
     }
 
+    public void OnInput(NetworkRunner runner, NetworkInput input)
+    {
+        NetworkInputData data = new NetworkInputData
+        {
+            move = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")),
+            jump = Input.GetButtonDown("Jump"),
+            crouch = Input.GetKey(KeyCode.LeftControl),
+            run = Input.GetKey(KeyCode.LeftShift),
+            isanim = Input.GetKey(KeyCode.W)
+        }; 
+        input.Set(data);
+    }
 
 
 
@@ -110,10 +122,6 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         
     }
 
-    public void OnInput(NetworkRunner runner, NetworkInput input)
-    {
-        
-    }
 
     public void OnInputMissing(NetworkRunner runner, PlayerRef player, NetworkInput input)
     {
