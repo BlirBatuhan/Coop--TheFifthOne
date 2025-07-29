@@ -7,5 +7,5 @@ public struct NetworkInputData : INetworkInput
     public bool jump;
     public bool crouch;
     public bool run;
-    public bool isanim; // Bu deðiþkeni kullanarak animasyon kontrolü yapabilirsiniz
+
 }
