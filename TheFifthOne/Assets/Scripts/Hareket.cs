@@ -22,26 +22,18 @@ public class Hareket : NetworkBehaviour
 
     private bool isGrounded;
 
-    private Vector2 input;
-    private bool isRunning;
-    private bool isJumping;
-    private bool isCrouching;
+    [Networked] private Vector2 input { get; set; }
+    [Networked] private bool isRunning { get; set; }
+    [Networked] private bool isJumping { get; set; }
+    [Networked] private bool isCrouching { get; set; }
 
-    // --- Networked pozisyon ve rotasyon ---
-    [Networked]
-    private Vector3 NetworkedPosition { get; set; }
-
-    [Networked]
-    private Quaternion NetworkedRotation { get; set; }
 
     public override void Spawned()
     {
         rb = GetComponent<Rigidbody>();
         anim = GetComponent<Animator>();
 
-        // Baþlangýç pozisyonu ayarla (örneðin spawn anýnda)
-        NetworkedPosition = transform.position;
-        NetworkedRotation = transform.rotation;
+        
     }
 
     public override void FixedUpdateNetwork()
@@ -100,22 +92,10 @@ public class Hareket : NetworkBehaviour
                 isJumping = false;
                 isGrounded = false;
 
-                // Bu frame'deki pozisyon ve rotasyonu network deðiþkenlerine kaydet (state authority ise)
-                if (Object.HasStateAuthority)
-                {
-                    NetworkedPosition = transform.position;
-                    NetworkedRotation = transform.rotation;
-                }
             }
-        }
-        else
-        {
-            // Eðer bu client otorite deðilse, network pozisyonunu uygula
-            transform.position = NetworkedPosition;
-            transform.rotation = NetworkedRotation;
+
         }
     }
-
     private Vector3 hareketHesapla(float hiz)
     {
         Vector3 hedefHiz = new Vector3(input.x, 0, input.y);

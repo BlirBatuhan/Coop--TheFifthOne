@@ -1,22 +1,62 @@
+using Fusion;
 using UnityEngine;
 
-public class MyCam : MonoBehaviour
+public class MyCam : NetworkBehaviour
 {
     float MouseX;
     float MouseY;
     public Transform Body;  // Vücut objesi
     public Transform Head;  // Kamera objesi veya ba? objesi
+    public Camera camera;
+    private bool isLocalPlayer;
 
     public float Angle;
 
-    void Start()
+    public override void Spawned()
     {
-        Cursor.lockState = CursorLockMode.Locked;
+        isLocalPlayer = Object.HasInputAuthority;
+
+        if (isLocalPlayer)
+        {
+            // Sadece yerel oyuncu için mouse'u kilitle
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+
+            // Kamerayý aktif et
+            if (camera != null)
+            {
+                camera.enabled = true;
+
+                // AudioListener kontrolü
+                AudioListener audioListener = camera.GetComponent<AudioListener>();
+                if (audioListener != null)
+                {
+                    audioListener.enabled = true;
+                }
+            }
+        }
+        else
+        {
+            // Diðer oyuncularýn kameralarýný kapat
+            if (camera != null)
+            {
+                camera.enabled = false;
+
+                // AudioListener'ý da kapat
+                AudioListener audioListener = camera.GetComponent<AudioListener>();
+                if (audioListener != null)
+                {
+                    audioListener.enabled = false;
+                }
+            }
+        }
+
+
     }
 
     void LateUpdate()
     {
-
+        if (!isLocalPlayer) return;
 
         MouseX = Input.GetAxis("Mouse X") * 100 * Time.deltaTime;
         Body.Rotate(Vector3.up, MouseX);
