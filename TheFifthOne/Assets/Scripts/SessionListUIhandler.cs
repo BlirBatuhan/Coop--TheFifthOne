@@ -65,7 +65,6 @@ public class SessionListUIhandler : MonoBehaviour
     
     public void OnCreateRoomButtonClicked()
     {
-        
         string roomName = "Room_" + Random.Range(1000, 9999);
         if (spawnPlayer != null)
         {
