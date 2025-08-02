@@ -6,8 +6,8 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/SyntyStudios/PolygonAdventure/Scenes/Preparing.unity
-    guid: d4fdf2957b3951c468cb27977eb07c51
+    path: Assets/SyntyStudios/PolygonAdventure/Scenes/Demo.unity
+    guid: e120d0e37ab427a4cb1c20085b85c472
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0
