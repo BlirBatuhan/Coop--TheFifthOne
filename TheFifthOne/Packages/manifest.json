@@ -1,6 +1,7 @@
 {
   "dependencies": {
-    "com.unity.ai.navigation": "2.0.5",
+    "com.luca3317.tmpeffects": "https://github.com/Luca3317/TMPEffects.git?path=/Package",
+    "com.unity.ai.navigation": "2.0.8",
     "com.unity.cinemachine": "3.1.4",
     "com.unity.collab-proxy": "2.8.2",
     "com.unity.ide.rider": "3.0.31",
