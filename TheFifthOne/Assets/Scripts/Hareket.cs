@@ -20,8 +20,11 @@ public class Hareket : NetworkBehaviour
     float[] Sag_Yon_Parametreleri = { 0.15f, 0.5f, 1 };
     float[] Egilme_Yon_Parametreleri = { 0.15f, 0.25f, 0.50f, 0.75f, 1f };
 
-    private bool isGrounded;
+    [Header("Camera")]
+    [SerializeField] private Camera playerCamera;
 
+    private bool isGrounded;
+    [Networked] public bool IsWaiting { get; set; } = true;
     [Networked] private Vector2 input { get; set; }
     [Networked] private bool isRunning { get; set; }
     [Networked] private bool isJumping { get; set; }

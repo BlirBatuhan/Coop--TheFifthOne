@@ -10,10 +10,21 @@ public class MyCam : NetworkBehaviour
     public Camera camera;
     private bool isLocalPlayer;
 
+    [Networked] public bool IsWaiting { get; set; } = true;
+
     public float Angle;
 
-    public override void Spawned()
+    public void Awake()
     {
+        if (camera != null)
+        {
+            camera.gameObject.SetActive(false);
+        }
+    }
+    public void SetWaitingMode(bool waiting)
+    {
+        IsWaiting = waiting;
+
         isLocalPlayer = Object.HasInputAuthority;
 
         if (isLocalPlayer)
@@ -51,6 +62,12 @@ public class MyCam : NetworkBehaviour
             }
         }
 
+        Debug.Log($"Player {Object.InputAuthority} waiting mode: {waiting}");
+    }
+    public override void Spawned()
+    {
+
+        SetWaitingMode(true);
 
     }
 

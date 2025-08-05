@@ -7,8 +7,6 @@ using System;
 using System.Threading.Tasks;
 using TMPro;
 
-
-
 public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
 {
     private NetworkRunner networkRunner;
@@ -18,17 +16,22 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     [SerializeField] private SessionListUIhandler sessionListUI;
     [SerializeField] private GameObject lobbyUI;
     [SerializeField] private GameObject gameUI;
-    [SerializeField] private GameObject odaKurUI;
-    [SerializeField] private GameObject roomLobbyUI; // Oda içi lobby ekraný
+    [SerializeField] private GameObject roomUI;
+    [SerializeField] private GameObject startGameButton; // Host için start butonu
+    [SerializeField] private Camera lobbyCamera;
+
+    // Bekleme alaný spawn pozisyonlarý
+    [SerializeField] private Transform[] waitingAreaSpawnPoints;
+    [SerializeField] private Vector3 defaultWaitingPosition = new Vector3(0, 1f, 0);
 
     [Header("Room UI Elements")]
     [SerializeField] private TextMeshProUGUI roomNameText;
     [SerializeField] private TextMeshProUGUI playerCountText;
-
-    // Room state management
-    private bool isRoomHost = false;
     private string currentRoomName = "";
-    private List<PlayerRef> playersInRoom = new List<PlayerRef>();
+
+    // Oyun durumu - sadece yerel kontrol
+    private bool gameStarted = false;
+    private bool isHost = false;
 
     // Oyuncularýn karakterlerini tutmak için bir sözlük
     private Dictionary<PlayerRef, NetworkObject> spawnedCharacters = new Dictionary<PlayerRef, NetworkObject>();
@@ -37,7 +40,7 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     {
         if (lobbyUI != null) lobbyUI.SetActive(true);
         if (gameUI != null) gameUI.SetActive(false);
-        if (roomLobbyUI != null) roomLobbyUI.SetActive(false);
+        if (startGameButton != null) startGameButton.SetActive(false);
 
         // Session discovery'yi baþlat
         await StartSessionDiscovery();
@@ -75,19 +78,15 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
 
     public async void CreateRoom(string roomName, int maxPlayers = 4)
     {
-        Debug.Log($"Creating room: {roomName}");
-
-        // Lobby runner'ý KAPAT (sadece oda oluþtururken)
         if (lobbyRunner != null && lobbyRunner.IsRunning)
         {
             await lobbyRunner.Shutdown();
         }
 
-        // UI'larý güncelle - Room Lobby'ye geç
-        if (lobbyUI != null) lobbyUI.SetActive(false);
-        if (odaKurUI != null) odaKurUI.SetActive(false);
-        if (gameUI != null) gameUI.SetActive(false);
-        if (roomLobbyUI != null) roomLobbyUI.SetActive(true); // Oda içi lobby
+        lobbyUI.SetActive(false);
+        gameUI.SetActive(true);
+        roomUI.SetActive(false);
+        isHost = true; // Oda kuruyoruz, host oluyoruz
 
         networkRunner = gameObject.GetComponent<NetworkRunner>();
         if (networkRunner == null)
@@ -99,6 +98,11 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         networkRunner.AddCallbacks(this);
 
         var scene = SceneRef.FromIndex(SceneManager.GetActiveScene().buildIndex);
+        var sceneInfo = new NetworkSceneInfo();
+        if (scene.IsValid)
+        {
+            sceneInfo.AddSceneRef(scene, LoadSceneMode.Additive);
+        }
 
         try
         {
@@ -112,38 +116,31 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
                 IsVisible = true,
                 IsOpen = true
             });
-
-            // Host olarak ayarla
-            isRoomHost = true;
             currentRoomName = roomName;
-            Debug.Log($"Room created: {roomName} with {maxPlayers} max players - You are the HOST");
-
-            // Room lobby UI'ýný güncelle
             UpdateRoomLobbyUI();
 
+            Debug.Log($"Room created: {roomName} with {maxPlayers} max players");
         }
         catch (Exception e)
         {
             Debug.LogError($"Failed to create room: {e.Message}");
-            // Hata durumunda ana lobby'ye dön
-            ResetToMainLobby();
+            lobbyUI.SetActive(true);
+            gameUI.SetActive(false);
+            isHost = false;
+            await StartSessionDiscovery();
         }
     }
 
     public async void JoinRoom(SessionInfo sessionInfo)
     {
-        Debug.Log($"Joining room: {sessionInfo.Name}");
-
-        // Lobby runner'ý KAPAT
         if (lobbyRunner != null && lobbyRunner.IsRunning)
         {
             await lobbyRunner.Shutdown();
         }
 
-        // UI'larý güncelle - Room Lobby'ye geç
-        if (lobbyUI != null) lobbyUI.SetActive(false);
-        if (gameUI != null) gameUI.SetActive(false);
-        if (roomLobbyUI != null) roomLobbyUI.SetActive(true);
+        lobbyUI.SetActive(false);
+        gameUI.SetActive(true);
+        isHost = false; // Odaya katýlýyoruz, host deðiliz
 
         networkRunner = gameObject.GetComponent<NetworkRunner>();
         if (networkRunner == null)
@@ -164,131 +161,62 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
                 SceneManager = gameObject.AddComponent<NetworkSceneManagerDefault>()
             });
 
-            // Guest olarak ayarla
-            isRoomHost = false;
-            currentRoomName = sessionInfo.Name;
-            Debug.Log($"Joined room: {sessionInfo.Name} - You are a GUEST");
-
-            // Room lobby UI'ýný güncelle
-            UpdateRoomLobbyUI();
-
+            Debug.Log($"Joined room: {sessionInfo.Name}");
         }
         catch (Exception e)
         {
             Debug.LogError($"Failed to join room: {e.Message}");
-            ResetToMainLobby();
+            lobbyUI.SetActive(true);
+            gameUI.SetActive(false);
+            isHost = false;
+            await StartSessionDiscovery();
         }
     }
-    // bu oyunu baþlatmak için kullanýlan fonksiyon
+
+    // Host'un oyunu baþlatmasý için
     public void StartGame()
     {
-        if (!isRoomHost)
+        if (isHost)
         {
-            Debug.LogWarning("Only the host can start the game!");
-            return;
+            gameStarted = true;
+
+            // Start butonunu gizle
+            if (startGameButton != null)
+                startGameButton.SetActive(false);
+
+            // Lobby kamerasýný kapat
+            if (lobbyCamera != null)
+                lobbyCamera.gameObject.SetActive(false);
+
+            // Tüm oyuncularý aktif et
+            ActivateAllPlayers();
+
+            Debug.Log("Host started the game!");
         }
-
-        if (networkRunner == null || !networkRunner.IsRunning)
-        {
-            Debug.LogError("No active room to start game!");
-            return;
-        }
-
-        Debug.Log("Host is starting the game...");
-
-        // DOÐRU: Fusion'da RPC'yi böyle çaðýrmalýsýn
-        StartGameRPC();
     }
 
-
-    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-    private void StartGameRPC()
+    private void ActivateAllPlayers()
     {
-        Debug.Log("Game started by host!");
-
-        // Tüm client'larda UI deðiþimi
-        if (roomLobbyUI != null) roomLobbyUI.SetActive(false);
-        if (gameUI != null) gameUI.SetActive(true);
-
-        // Oyuncularý spawn et
-        Invoke("SpawnAllPlayersFromDictionary", 1f);
-    }
-
-    private void SpawnAllPlayersFromDictionary()
-    {
-        // Sadece host (StateAuthority sahibi) spawn iþlemini yapabilir
-        if (!isRoomHost)
+        foreach (var kvp in spawnedCharacters)
         {
-            Debug.Log("Only host can spawn players");
-            return;
-        }
-
-        Debug.Log($"Host spawning players from dictionary. Players in room: {playersInRoom.Count}");
-
-        // Sözlükteki tüm oyuncularý spawn et
-        for (int i = 0; i < playersInRoom.Count; i++)
-        {
-            var player = playersInRoom[i];
-
-            if (!spawnedCharacters.ContainsKey(player))
+            if (kvp.Value != null)
             {
-                Debug.Log($"Spawning player from dictionary: {player}");
-                SpawnCharacter(player);
+                MyCam camcontroller = kvp.Value.GetComponent<MyCam>();
+                if (camcontroller != null)
+                {
+                    camcontroller.SetWaitingMode(false);
+
+                    // Sadece local player'ýn kamerasýný aktif et
+                    if (kvp.Key == networkRunner.LocalPlayer)
+                    {
+                        Camera playerCamera = kvp.Value.GetComponentInChildren<Camera>();
+                        if (playerCamera != null)
+                        {
+                            playerCamera.gameObject.SetActive(true);
+                        }
+                    }
+                }
             }
-            else
-            {
-                Debug.Log($"Player {player} already spawned, skipping");
-            }
-        }
-
-        Debug.Log($"Spawn completed. Total spawned characters: {spawnedCharacters.Count}");
-    }
-
-    private void SpawnCharacter(PlayerRef player)
-    {
-        if (PlayerPrefab == null)
-        {
-            Debug.LogError("PlayerPrefab is null!");
-            return;
-        }
-
-        if (spawnedCharacters.ContainsKey(player))
-        {
-            Debug.LogWarning($"Player {player} already spawned!");
-            return;
-        }
-
-        // Pozisyonu hesapla
-        Vector3 playerPos = new Vector3(
-            (player.RawEncoded % 4) * 3, // Max 4 oyuncu için
-            1f,
-            0f
-        );
-
-        Debug.Log($"Spawning player {player} at position: {playerPos}");
-
-        try
-        {
-            NetworkObject networkObject = networkRunner.Spawn(
-                PlayerPrefab,
-                playerPos,
-                Quaternion.identity,
-                player // Bu parametreyi input authority olarak ayarlar
-            );
-
-            if (networkObject != null)
-            {
-                spawnedCharacters.Add(player, networkObject);
-                Debug.Log($"? Player {player} spawned successfully! Total spawned: {spawnedCharacters.Count}");
-            }
-            else
-            {
-                Debug.LogError($"? Failed to spawn player {player} - NetworkObject is null!");
-            }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"? Exception while spawning player {player}: {e.Message}");
         }
     }
 
@@ -304,25 +232,12 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
             await networkRunner.Shutdown();
         }
 
-        // Ana lobby'ye dön
-        ResetToMainLobby();
-    }
-
-    private async void ResetToMainLobby()
-    {
-        // State'i sýfýrla
-        isRoomHost = false;
-        currentRoomName = "";
-        playersInRoom.Clear();
-        spawnedCharacters.Clear();
-
-        // UI'larý sýfýrla
         if (lobbyUI != null) lobbyUI.SetActive(true);
         if (gameUI != null) gameUI.SetActive(false);
-        if (roomLobbyUI != null) roomLobbyUI.SetActive(false);
-        if (odaKurUI != null) odaKurUI.SetActive(false);
 
-        // Session discovery'yi yeniden baþlat
+        gameStarted = false;
+        isHost = false;
+
         await StartSessionDiscovery();
     }
 
@@ -330,32 +245,54 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     {
         if (runner != networkRunner) return;
 
-        Debug.Log($"Player joined room: {player} (LocalPlayer: {runner.LocalPlayer == player})");
+        Debug.Log($"Player joined: {player}");
 
-        // Player'ý listeye ekle (sözlüðe)
-        if (!playersInRoom.Contains(player))
+        if (lobbyUI != null) lobbyUI.SetActive(false);
+        if (gameUI != null) gameUI.SetActive(true);
+
+        // Host ise start butonunu göster
+        if (isHost && startGameButton != null)
         {
-            playersInRoom.Add(player);
-            Debug.Log($"Added player {player} to room list. Total players: {playersInRoom.Count}");
-
-            // Sözlükteki oyuncu listesini yazdýr
-            Debug.Log("Current players in room:");
-            for (int i = 0; i < playersInRoom.Count; i++)
-            {
-                Debug.Log($"  - Player {i}: {playersInRoom[i]}");
-            }
+            startGameButton.SetActive(true);
         }
 
-        // Room lobby UI'ýný güncelle
-        UpdateRoomLobbyUI();
-
-        // Eðer oyun zaten baþlamýþsa ve host ise, yeni player'ý spawn et
-        if (gameUI != null && gameUI.activeInHierarchy && isRoomHost)
+        // Her oyuncu kendi karakterini bekleme alanýnda spawn eder
+        if (player == runner.LocalPlayer)
         {
-            if (!spawnedCharacters.ContainsKey(player))
+            if (PlayerPrefab == null)
             {
-                Debug.Log($"Game already started, spawning new player: {player}");
-                SpawnCharacter(player);
+                Debug.LogError("PlayerPrefab is null!");
+                return;
+            }
+
+            // Bekleme alanýnda spawn pozisyonu belirle
+            Vector3 waitingPos = GetWaitingAreaPosition(player);
+
+            Debug.Log($"Spawning player at waiting area position: {waitingPos}");
+
+            NetworkObject networkObject = runner.Spawn(
+                PlayerPrefab,
+                waitingPos,
+                Quaternion.identity,
+                player
+            );
+
+            if (networkObject != null)
+            {
+                spawnedCharacters.Add(player, networkObject);
+
+                // Player controller'ý al ve bekleme moduna al
+                MyCam camController = networkObject.GetComponent<MyCam>();
+                if (camController != null)
+                {
+                    camController.SetWaitingMode(true);
+                }
+
+                Debug.Log("Player spawned in waiting area!");
+            }
+            else
+            {
+                Debug.LogError("Failed to spawn player!");
             }
         }
     }
@@ -364,12 +301,8 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     {
         if (runner != networkRunner) return;
 
-        Debug.Log($"Player left room: {player}");
+        Debug.Log($"Player left: {player}");
 
-        // Player'ý listeden çýkar
-        playersInRoom.Remove(player);
-
-        // Spawn edilmiþ karakteri temizle
         if (spawnedCharacters.TryGetValue(player, out NetworkObject networkObject))
         {
             if (networkObject != null)
@@ -378,17 +311,19 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
             }
             spawnedCharacters.Remove(player);
         }
-
-        // Room lobby UI'ýný güncelle
-        UpdateRoomLobbyUI();
     }
 
-    private void UpdateRoomLobbyUI()
+    private Vector3 GetWaitingAreaPosition(PlayerRef player)
     {
-        // Room lobby UI bileþenlerini güncelle
-        roomNameText.text = $"{currentRoomName}";
-        playerCountText.text = $"{playersInRoom.Count} / {networkRunner.Config.Simulation.PlayerCount}";
+        // Eðer spawn noktalarý tanýmlanmýþsa onlarý kullan
+        if (waitingAreaSpawnPoints != null && waitingAreaSpawnPoints.Length > 0)
+        {
+            int index = player.RawEncoded % waitingAreaSpawnPoints.Length;
+            return waitingAreaSpawnPoints[index].position;
+        }
 
+        // Yoksa default pozisyondan hareketle daðýt
+        return defaultWaitingPosition + new Vector3(player.RawEncoded * 2f, 0, 0);
     }
 
     public void OnSessionListUpdated(NetworkRunner runner, List<SessionInfo> sessionList)
@@ -427,6 +362,9 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     {
         if (runner != networkRunner) return;
 
+        // Sadece oyun baþladýysa input al
+        if (!gameStarted) return;
+
         NetworkInputData data = new NetworkInputData
         {
             move = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")),
@@ -436,6 +374,22 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         };
         input.Set(data);
     }
+
+
+    public void onCreateRoom()
+    {
+        if(lobbyUI != null) lobbyUI.SetActive(false);
+        if(roomUI != null) roomUI.SetActive(true);
+    }
+
+    private void UpdateRoomLobbyUI()
+    {
+        // Room lobby UI bile?enlerini güncelle
+        roomNameText.text = $"{currentRoomName}";
+        playerCountText.text = $"{spawnedCharacters.Count} / {networkRunner.Config.Simulation.PlayerCount}";
+
+    }
+
 
     private async void OnDestroy()
     {
@@ -450,6 +404,7 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         }
     }
 
+    // Diðer callback'ler
     public void OnConnectedToServer(NetworkRunner runner)
     {
         if (runner == lobbyRunner)
@@ -467,31 +422,25 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         Debug.LogError($"Connection failed: {reason}");
     }
 
+    public void OnConnectRequest(NetworkRunner runner, NetworkRunnerCallbackArgs.ConnectRequest request, byte[] token) { }
+    public void OnCustomAuthenticationResponse(NetworkRunner runner, Dictionary<string, object> data) { }
+
     public void OnDisconnectedFromServer(NetworkRunner runner, NetDisconnectReason reason)
     {
         Debug.Log($"Disconnected: {reason}");
 
-        /* if (runner == networkRunner)
-         {
-             // Ana lobby'ye dön
-             _ = Task.Run(async () => {
-                 await Task.Delay(100); // Kýsa gecikme
-                 UnityMainThreadDispatcher.Instance().Enqueue(() => ResetToMainLobby());
-             });
-         }*/
+        if (runner == networkRunner)
+        {
+            if (lobbyUI != null) lobbyUI.SetActive(true);
+            if (gameUI != null) gameUI.SetActive(false);
+
+            gameStarted = false;
+            isHost = false;
+
+            _ = StartSessionDiscovery();
+        }
     }
 
-    public void OdaKur()
-    {
-        if (lobbyUI != null) lobbyUI.SetActive(false);
-        if (gameUI != null) gameUI.SetActive(false);
-        if (roomLobbyUI != null) roomLobbyUI.SetActive(false);
-        if (odaKurUI != null) odaKurUI.SetActive(true);
-    }
-
-    // Diðer callback'ler
-    public void OnConnectRequest(NetworkRunner runner, NetworkRunnerCallbackArgs.ConnectRequest request, byte[] token) { }
-    public void OnCustomAuthenticationResponse(NetworkRunner runner, Dictionary<string, object> data) { }
     public void OnHostMigration(NetworkRunner runner, HostMigrationToken hostMigrationToken) { }
     public void OnInputMissing(NetworkRunner runner, PlayerRef player, NetworkInput input) { }
     public void OnObjectEnterAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
@@ -500,9 +449,11 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     public void OnReliableDataReceived(NetworkRunner runner, PlayerRef player, ReliableKey key, ArraySegment<byte> data) { }
     public void OnSceneLoadDone(NetworkRunner runner) { }
     public void OnSceneLoadStart(NetworkRunner runner) { }
+
     public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason)
     {
         Debug.Log($"Runner shutdown: {shutdownReason} - Runner: {(runner == lobbyRunner ? "Lobby" : "Game")}");
     }
+
     public void OnUserSimulationMessage(NetworkRunner runner, SimulationMessagePtr message) { }
 }
