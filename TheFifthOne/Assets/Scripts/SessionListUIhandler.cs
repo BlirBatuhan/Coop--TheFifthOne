@@ -8,6 +8,8 @@ public class SessionListUIhandler : MonoBehaviour
     public TextMeshProUGUI statuText;
     public GameObject sessionInfoUIPrefab;
     public VerticalLayoutGroup VerticalLayoutGroup;
+    public TMP_InputField roomNameInputField;
+    public TextMeshProUGUI OdaKontrol;
 
     
     [SerializeField] private SpawnPlayer spawnPlayer;
@@ -62,15 +64,22 @@ public class SessionListUIhandler : MonoBehaviour
         statuText.gameObject.SetActive(true);
     }
 
-    
+
     public void OnCreateRoomButtonClicked()
     {
-        string roomName = "Room_" + Random.Range(1000, 9999);
+        if (roomNameInputField == null || string.IsNullOrEmpty(roomNameInputField.text))
+        {
+            Debug.LogError("Room name input field is empty. Please enter a room name.");
+            OdaKontrol.text = "Oda Adý Boþ Olmamalý";
+            return;
+        }
+        else { 
+        string roomName = roomNameInputField.text.Trim();
         if (spawnPlayer != null)
         {
             spawnPlayer.CreateRoom(roomName, 4);
         }
+        }
     }
-
     
 }
