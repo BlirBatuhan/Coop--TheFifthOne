@@ -2504,6 +2504,8 @@ MonoBehaviour:
   kosmaHiz: 6
   airControl: 0.5
   ziplamaSiniri: 4
+  playerCamera: {fileID: 0}
+  _IsWaiting: 1
 --- !u!136 &9166354401258392284
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -3553,7 +3555,7 @@ Camera:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6940130937297392133}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 2
   m_ClearFlags: 1
   m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
@@ -3664,6 +3666,7 @@ MonoBehaviour:
   Body: {fileID: 3242867915836576657}
   Head: {fileID: 8311284174878061665}
   camera: {fileID: 7259312394071436225}
+  _IsWaiting: 1
   Angle: 0
 --- !u!1 &6980609733607278711
 GameObject:

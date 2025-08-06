@@ -24245,6 +24245,53 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 498332, guid: 00ed5f0c12fd8d5499f54fb0096adab9, type: 3}
   m_PrefabInstance: {fileID: 534285330}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &536852351
+GameObject:
+  m_ObjectHideFlags: 8
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 536852353}
+  - component: {fileID: 536852352}
+  m_Layer: 0
+  m_Name: Fusion_PhotonBackgroundConnectionHandler
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &536852352
+MonoBehaviour:
+  m_ObjectHideFlags: 8
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 536852351}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1222927710, guid: 7de3b8b9e1263ad479e2d0c4261b7646, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  DisconnectAfterKeepAlive: 0
+  KeepAliveInBackground: 60000
+  ApplyDontDestroyOnLoad: 1
+--- !u!4 &536852353
+Transform:
+  m_ObjectHideFlags: 8
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 536852351}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &537830434
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -35105,6 +35152,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 1525661489236630818}
     - target: {fileID: 3818577962871573809, guid: 6fb6f2438b013784082ed772a2a910bb, type: 3}
+      propertyPath: inRoomUI
+      value: 
+      objectReference: {fileID: 1506579467}
+    - target: {fileID: 3818577962871573809, guid: 6fb6f2438b013784082ed772a2a910bb, type: 3}
       propertyPath: odaKurUI
       value: 
       objectReference: {fileID: 1860652553}
@@ -35112,6 +35163,10 @@ PrefabInstance:
       propertyPath: rpcHandler
       value: 
       objectReference: {fileID: 0}
+    - target: {fileID: 3818577962871573809, guid: 6fb6f2438b013784082ed772a2a910bb, type: 3}
+      propertyPath: LobbyCamera
+      value: 
+      objectReference: {fileID: 917066680}
     - target: {fileID: 3818577962871573809, guid: 6fb6f2438b013784082ed772a2a910bb, type: 3}
       propertyPath: lobbyCamera
       value: 
@@ -100893,7 +100948,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 4527534815965847859}
   m_HandleRect: {fileID: 6879109278548737733}
   m_Direction: 2
-  m_Value: 1
+  m_Value: 0
   m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
@@ -101508,3 +101563,4 @@ SceneRoots:
   - {fileID: 917066684}
   - {fileID: 5746216322040547591}
   - {fileID: 199937301}
+  - {fileID: 536852353}

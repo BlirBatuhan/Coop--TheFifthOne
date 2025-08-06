@@ -13,6 +13,7 @@ public class SessionListUIhandler : MonoBehaviour
 
     
     [SerializeField] private SpawnPlayer spawnPlayer;
+    
 
     private void Start()
     {

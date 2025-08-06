@@ -8,7 +8,9 @@ public class MyCam : NetworkBehaviour
     public Transform Body;  // Vücut objesi
     public Transform Head;  // Kamera objesi veya ba? objesi
     public Camera camera;
+    
     private bool isLocalPlayer;
+    public static MyCam instance;
 
     [Networked] public bool IsWaiting { get; set; } = true;
 
@@ -16,9 +18,21 @@ public class MyCam : NetworkBehaviour
 
     public void Awake()
     {
+
+
         if (camera != null)
         {
-            camera.gameObject.SetActive(false);
+            camera.enabled = false; 
+        }
+    }
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    public void RPC_DisableLobbyCamera()
+    {
+        GameObject cam = GameObject.Find("LobbyCamera");
+        if (cam != null)
+        {
+            cam.SetActive(false);
+            Debug.Log("LobbyCamera deactivated on client: " + Object.InputAuthority);
         }
     }
     public void SetWaitingMode(bool waiting)
@@ -29,15 +43,16 @@ public class MyCam : NetworkBehaviour
 
         if (isLocalPlayer)
         {
-            // Sadece yerel oyuncu için mouse'u kilitle
+            // ODA BEKLEME ALANI  DÜZENLENECEK
+            /* Sadece yerel oyuncu için mouse'u kilitle
             Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            Cursor.visible = false;*/
 
             // Kamerayý aktif et
-            if (camera != null)
+            if (camera != null && !IsWaiting)
             {
                 camera.enabled = true;
-
+                
                 // AudioListener kontrolü
                 AudioListener audioListener = camera.GetComponent<AudioListener>();
                 if (audioListener != null)

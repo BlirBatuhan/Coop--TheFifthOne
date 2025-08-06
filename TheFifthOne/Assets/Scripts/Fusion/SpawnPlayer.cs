@@ -17,8 +17,10 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     [SerializeField] private GameObject lobbyUI;
     [SerializeField] private GameObject gameUI;
     [SerializeField] private GameObject roomUI;
+    [SerializeField] private GameObject inRoomUI;
     [SerializeField] private GameObject startGameButton; // Host için start butonu
-    [SerializeField] private Camera lobbyCamera;
+    [SerializeField] GameObject LobbyCamera;
+    
 
     // Bekleme alaný spawn pozisyonlarý
     [SerializeField] private Transform[] waitingAreaSpawnPoints;
@@ -84,8 +86,9 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         }
 
         lobbyUI.SetActive(false);
-        gameUI.SetActive(true);
+        gameUI.SetActive(false);
         roomUI.SetActive(false);
+        inRoomUI.SetActive(true);
         isHost = true; // Oda kuruyoruz, host oluyoruz
 
         networkRunner = gameObject.GetComponent<NetworkRunner>();
@@ -116,9 +119,8 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
                 IsVisible = true,
                 IsOpen = true
             });
-            currentRoomName = roomName;
-            UpdateRoomLobbyUI();
 
+            currentRoomName = roomName;
             Debug.Log($"Room created: {roomName} with {maxPlayers} max players");
         }
         catch (Exception e)
@@ -139,7 +141,7 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         }
 
         lobbyUI.SetActive(false);
-        gameUI.SetActive(true);
+        inRoomUI.SetActive(true);
         isHost = false; // Odaya katýlýyoruz, host deðiliz
 
         networkRunner = gameObject.GetComponent<NetworkRunner>();
@@ -184,11 +186,6 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
             if (startGameButton != null)
                 startGameButton.SetActive(false);
 
-            // Lobby kamerasýný kapat
-            if (lobbyCamera != null)
-                lobbyCamera.gameObject.SetActive(false);
-
-            // Tüm oyuncularý aktif et
             ActivateAllPlayers();
 
             Debug.Log("Host started the game!");
@@ -197,23 +194,43 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
 
     private void ActivateAllPlayers()
     {
+        Debug.Log($"Activating {spawnedCharacters.Count} players");
+
         foreach (var kvp in spawnedCharacters)
         {
+            var controller = kvp.Value.GetComponentInChildren<MyCam>();
+            Debug.Log($"Controller for player {kvp.Key}: {(controller != null ? "found" : "null")}");
+            if (controller != null && controller.HasStateAuthority) // sadece stateAuthority olan biri tetikler
+            {
+                Debug.Log($"Disabling lobby camera for player {kvp.Key}");
+                controller.RPC_DisableLobbyCamera(); // RPC herkese gider
+            }
             if (kvp.Value != null)
             {
-                MyCam camcontroller = kvp.Value.GetComponent<MyCam>();
-                if (camcontroller != null)
+                // MyCam component'ini kontrol et
+                MyCam camController = kvp.Value.GetComponentInChildren<Camera>().GetComponent<MyCam>();
+                if (camController != null)
                 {
-                    camcontroller.SetWaitingMode(false);
+                    Debug.Log($"Setting waiting mode to false for player {kvp.Key}");
+                    camController.SetWaitingMode(false);
+                }
+                else
+                {
+                    Debug.LogError($"MyCam component not found on player {kvp.Key}");
+                }
 
-                    // Sadece local player'ýn kamerasýný aktif et
-                    if (kvp.Key == networkRunner.LocalPlayer)
+                // Sadece local player'ýn kamerasýný aktif et
+                if (kvp.Key == networkRunner.LocalPlayer)
+                {
+                    Camera playerCamera = kvp.Value.GetComponentInChildren<Camera>();
+                    if (playerCamera != null)
                     {
-                        Camera playerCamera = kvp.Value.GetComponentInChildren<Camera>();
-                        if (playerCamera != null)
-                        {
-                            playerCamera.gameObject.SetActive(true);
-                        }
+                        playerCamera.gameObject.SetActive(true);
+                        Debug.Log("Local player camera activated");
+                    }
+                    else
+                    {
+                        Debug.LogError("Player camera not found");
                     }
                 }
             }
@@ -248,13 +265,13 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         Debug.Log($"Player joined: {player}");
 
         if (lobbyUI != null) lobbyUI.SetActive(false);
-        if (gameUI != null) gameUI.SetActive(true);
+        if (inRoomUI != null) inRoomUI.SetActive(true);
 
         // Host ise start butonunu göster
         if (isHost && startGameButton != null)
         {
             startGameButton.SetActive(true);
-        }
+        }     
 
         // Her oyuncu kendi karakterini bekleme alanýnda spawn eder
         if (player == runner.LocalPlayer)
@@ -287,6 +304,8 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
                 {
                     camController.SetWaitingMode(true);
                 }
+                playerCountText.text = $"{spawnedCharacters.Values.Count} / 4";
+                UpdateRoomLobbyUI();
 
                 Debug.Log("Player spawned in waiting area!");
             }
