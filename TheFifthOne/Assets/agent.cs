@@ -14,16 +14,18 @@ public class MonsterAI : MonoBehaviour
     public LayerMask obstacleMask;
 
     [Header("Takip ve Saldýrý")]
-    public float chaseSpeed = 3.5f;
     public float attackDistance = 2f;
+    
 
     private NavMeshAgent agent;
     private Transform targetPlayer;
+    private Animator anim;
 
     void Start()
     {
+        anim = GetComponent<Animator>();
         agent = GetComponent<NavMeshAgent>();
-        agent.speed = chaseSpeed;
+       
     }
 
     void Update()
@@ -44,16 +46,19 @@ public class MonsterAI : MonoBehaviour
 
     void SearchForPlayer()
     {
+        agent.isStopped = false; 
         Collider[] targets = Physics.OverlapSphere(transform.position, detectionRadius, playerMask);
 
         foreach (Collider target in targets)
         {
+            //göz pozisyonuyla hedef arasýndaki yönü hesapla
             Vector3 dirToTarget = (target.transform.position - eyePoint.position).normalized;
+            // Hedefe olan açýyý kontrol et
             float angle = Vector3.Angle(eyePoint.forward, dirToTarget);
 
             Debug.DrawRay(eyePoint.position, dirToTarget * detectionRadius, Color.red);
 
-            if (angle < viewAngle / 2f)
+            if (angle < viewAngle / 1.5f)
             {
                 // Engel kontrolü - eðer ray bir engele çarparsa oyuncuyu göremeyiz
                 if (Physics.Raycast(eyePoint.position, dirToTarget, out RaycastHit hit, detectionRadius, obstacleMask))
@@ -79,9 +84,16 @@ public class MonsterAI : MonoBehaviour
         }
 
         Debug.Log("Takip ediliyor.");
+        anim.SetFloat("speed", 0.2f);
         agent.SetDestination(targetPlayer.position);
 
         float distance = Vector3.Distance(transform.position, targetPlayer.position);
+
+        if(distance <= detectionRadius/2)
+        {
+            anim.SetFloat("speed", 0.5f);
+        }
+
         if (distance <= attackDistance)
         {
             currentState = AIState.Attack;
@@ -90,9 +102,12 @@ public class MonsterAI : MonoBehaviour
         // Oyuncu çok uzaklaþtýysa takibi býrak
         if (distance > detectionRadius * 1.5f)
         {
+            agent.isStopped = true;
+            agent.ResetPath();
             Debug.Log("Oyuncu çok uzaklaþtý, takip durduruluyor.");
             targetPlayer = null;
             currentState = AIState.Idle;
+            anim.SetFloat("speed", 0);
         }
     }
 
@@ -104,7 +119,7 @@ public class MonsterAI : MonoBehaviour
             return;
         }
 
-
+        anim.SetFloat("speed", 0);
         
         Vector3 lookDirection = targetPlayer.position - transform.position;
         lookDirection.y = 0; // canavarin geriye yatmasi engellendi
