@@ -6,7 +6,13 @@ using System.Collections.Generic;
 using System;
 using System.Threading.Tasks;
 using TMPro;
-using static Unity.Collections.Unicode;
+
+public enum GameState
+{
+    Lobby,
+    WaitingRoom,
+    InGame
+}
 
 public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
 {
@@ -15,18 +21,19 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     [SerializeField] private NetworkObject gameManagerPrefab;
     private bool gameManagerSpawned = false;
 
-
     [SerializeField] public GameObject PlayerPrefab;
     [SerializeField] private SessionListUIhandler sessionListUI;
     [SerializeField] private GameObject lobbyUI;
     [SerializeField] private GameObject gameUI;
     [SerializeField] private GameObject roomUI;
     [SerializeField] private GameObject inRoomUI;
-    [SerializeField] private GameObject startGameButton; // Host i?in start butonu
-    
+    [SerializeField] private GameObject startGameButton;
 
+    // Scene referanslarý
+    [SerializeField] private int waitingRoomSceneIndex = 1; // Bekleme alaný scene'i
+    [SerializeField] private int gameSceneIndex = 2; // Oyun scene'i
 
-    // Bekleme alan? spawn pozisyonlar?
+    // Bekleme alaný spawn pozisyonlarý
     [SerializeField] private Transform[] waitingAreaSpawnPoints;
     [SerializeField] private Vector3 defaultWaitingPosition = new Vector3(0, 1f, 0);
 
@@ -35,29 +42,62 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     [SerializeField] private TextMeshProUGUI playerCountText;
     private string currentRoomName = "";
 
-    // Oyun durumu - sadece yerel kontrol
-    private bool gameStarted = false;
+    // Game State Management
+    private GameState currentGameState = GameState.Lobby;
     private bool isHost = false;
 
-    // Oyuncular?n karakterlerini tutmak i?in bir s?zl?k
+    // Oyuncularýn karakterlerini tutmak için
     private Dictionary<PlayerRef, NetworkObject> spawnedCharacters = new Dictionary<PlayerRef, NetworkObject>();
 
     private async void Start()
     {
-        if (lobbyUI != null) lobbyUI.SetActive(true);
+        DontDestroyOnLoad(this.gameObject);
+        SetGameState(GameState.Lobby);
+        await StartSessionDiscovery();
+    }
+
+    private void SetGameState(GameState newState)
+    {
+        currentGameState = newState;
+        UpdateUIBasedOnGameState();
+        Debug.Log($"Game state changed to: {currentGameState}");
+    }
+
+    private void UpdateUIBasedOnGameState()
+    {
+        // Tüm UI'larý kapat
+        if (lobbyUI != null) lobbyUI.SetActive(false);
         if (gameUI != null) gameUI.SetActive(false);
+        if (roomUI != null) roomUI.SetActive(false);
+        if (inRoomUI != null) inRoomUI.SetActive(false);
         if (startGameButton != null) startGameButton.SetActive(false);
 
-        // Session discovery'yi ba?lat
-        await StartSessionDiscovery();
+        // Current state'e göre UI'larý aç
+        switch (currentGameState)
+        {
+            case GameState.Lobby:
+                if (lobbyUI != null) lobbyUI.SetActive(true);
+                break;
+            case GameState.WaitingRoom:
+                if (inRoomUI != null) inRoomUI.SetActive(true);
+                if (isHost && startGameButton != null) startGameButton.SetActive(true);
+                break;
+            case GameState.InGame:
+                if (gameUI != null) gameUI.SetActive(true);
+                break;
+        }
     }
 
     private async Task StartSessionDiscovery()
     {
+        if (lobbyRunner != null && lobbyRunner.IsRunning)
+        {
+            await lobbyRunner.Shutdown();
+        }
+
         GameObject lobbyObject = new GameObject("LobbyRunner");
         lobbyObject.transform.SetParent(this.transform);
         lobbyRunner = lobbyObject.AddComponent<NetworkRunner>();
-
         lobbyRunner.AddCallbacks(this);
 
         try
@@ -71,17 +111,6 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         }
     }
 
-    public async void RefreshSessionList()
-    {
-        if (lobbyRunner != null && lobbyRunner.IsRunning)
-        {
-            await lobbyRunner.Shutdown();
-            await Task.Delay(500);
-        }
-
-        await StartSessionDiscovery();
-    }
-
     public async void CreateRoom(string roomName, int maxPlayers = 4)
     {
         if (lobbyRunner != null && lobbyRunner.IsRunning)
@@ -89,54 +118,10 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
             await lobbyRunner.Shutdown();
         }
 
-        lobbyUI.SetActive(false);
-        gameUI.SetActive(false);
-        roomUI.SetActive(false);
-        inRoomUI.SetActive(true);
-        isHost = true; // Oda kuruyoruz, host oluyoruz
+        isHost = true;
+        SetGameState(GameState.WaitingRoom);
 
-        networkRunner = gameObject.GetComponent<NetworkRunner>();
-        if (networkRunner == null)
-        {
-            networkRunner = gameObject.AddComponent<NetworkRunner>();
-        }
-        
-
-        networkRunner.ProvideInput = true;
-        networkRunner.AddCallbacks(this);
-
-        var scene = SceneRef.FromIndex(SceneManager.GetActiveScene().buildIndex);
-        var sceneInfo = new NetworkSceneInfo();
-        if (scene.IsValid)
-        {
-            sceneInfo.AddSceneRef(scene, LoadSceneMode.Additive);
-        }
-
-        try
-        {
-            await networkRunner.StartGame(new StartGameArgs()
-            {
-                GameMode = GameMode.Shared,
-                SessionName = roomName,
-                PlayerCount = maxPlayers,
-                Scene = scene,
-                SceneManager = gameObject.AddComponent<NetworkSceneManagerDefault>(),
-                IsVisible = true,
-                IsOpen = true
-            });
-
-            currentRoomName = roomName;
-            Debug.Log($"Room created: {roomName} with {maxPlayers} max players");
-            
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"Failed to create room: {e.Message}");
-            lobbyUI.SetActive(true);
-            gameUI.SetActive(false);
-            isHost = false;
-            await StartSessionDiscovery();
-        }
+        await StartNetworkRunner(roomName, maxPlayers, true);
     }
 
     public async void JoinRoom(SessionInfo sessionInfo)
@@ -146,190 +131,212 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
             await lobbyRunner.Shutdown();
         }
 
-        lobbyUI.SetActive(false);
-        inRoomUI.SetActive(true);
-        isHost = false; // Odaya kat?l?yoruz, host de?iliz
+        isHost = false;
+        SetGameState(GameState.WaitingRoom);
 
+        await StartNetworkRunner(sessionInfo.Name, 4, false);
+    }
+
+    private async Task StartNetworkRunner(string sessionName, int maxPlayers, bool isCreating)
+    {
         networkRunner = gameObject.GetComponent<NetworkRunner>();
         if (networkRunner == null)
         {
             networkRunner = gameObject.AddComponent<NetworkRunner>();
         }
 
-        networkRunner.ProvideInput = true;
+        networkRunner.ProvideInput = (currentGameState == GameState.InGame);
         networkRunner.AddCallbacks(this);
+
+        // Bekleme alaný scene'inde baþlat
+        var scene = SceneRef.FromIndex(waitingRoomSceneIndex);
+        currentRoomName = sessionName;
 
         try
         {
             await networkRunner.StartGame(new StartGameArgs()
             {
                 GameMode = GameMode.Shared,
-                SessionName = sessionInfo.Name,
-                Scene = SceneRef.FromIndex(SceneManager.GetActiveScene().buildIndex),
-                SceneManager = gameObject.AddComponent<NetworkSceneManagerDefault>()
+                SessionName = sessionName,
+                PlayerCount = maxPlayers,
+                Scene = scene,
+                SceneManager = gameObject.AddComponent<NetworkSceneManagerDefault>(),
+                IsVisible = true,
+                IsOpen = true
             });
 
-            Debug.Log($"Joined room: {sessionInfo.Name}");
+            Debug.Log($"Network runner started in waiting room: {sessionName}");
         }
         catch (Exception e)
         {
-            Debug.LogError($"Failed to join room: {e.Message}");
-            lobbyUI.SetActive(true);
-            gameUI.SetActive(false);
-            isHost = false;
+            Debug.LogError($"Failed to start network runner: {e.Message}");
+            SetGameState(GameState.Lobby);
             await StartSessionDiscovery();
         }
     }
 
-    // GameManager StartGame metodu
+    // Host tarafýndan oyunu baþlat
     public void StartGame()
     {
-        if (isHost)
+        if (!isHost || currentGameState != GameState.WaitingRoom) return;
+
+        Debug.Log("Host requesting game start via GameManager");
+
+        // GameManager'a oyun baþlatma isteði gönder
+        GameManager gm = FindObjectOfType<GameManager>();
+        if (gm != null)
         {
-            gameStarted = true;
-
-            if (startGameButton != null)
-                startGameButton.SetActive(false);
-
-            ActivateAllPlayers();
-
-            // Global GameManager property'sini deðiþtir
-            GameManager gm = FindObjectOfType<GameManager>();
-            if (gm != null)
-            {
-                gm.gameStarted = true; // Sadece bu property deðiþir
-                Debug.Log("Global game state changed to Started!");
-            }
+            gm.StartGame(); // GameManager countdown'u baþlatacak
+        }
+        else
+        {
+            Debug.LogError("GameManager not found!");
         }
     }
 
-
-    private void ActivateAllPlayers()
+    // GameManager tarafýndan çaðrýlýr
+    public async void TransitionToGameScene()
     {
-        Debug.Log($"Activating {spawnedCharacters.Count} players");
+        if (!isHost) return;
 
-        foreach (var kvp in spawnedCharacters)
+        Debug.Log("Transitioning to game scene...");
+
+        // Game state'i deðiþtir
+        SetGameState(GameState.InGame);
+
+        // Input handling'i aktif et
+        networkRunner.ProvideInput = true;
+
+        // Oyun scene'ine geç
+        var gameScene = SceneRef.FromIndex(gameSceneIndex);
+
+        try
         {
-            var controller = kvp.Value.GetComponentInChildren<MyCam>();
-            Debug.Log($"Controller for player {kvp.Key}: {(controller != null ? "found" : "null")}");
-            if (controller != null && controller.HasStateAuthority) // sadece stateAuthority olan biri tetikler
-            {
-                Debug.Log($"Disabling lobby camera for player {kvp.Key}");
-               // controller.RPC_DisableLobbyCamera(); // RPC herkese gider
-            }
-            if (kvp.Value != null)
-            {
-                // MyCam component'ini kontrol et
-                MyCam camController = kvp.Value.GetComponentInChildren<Camera>().GetComponent<MyCam>();
-                if (camController != null)
-                {
-                    Debug.Log($"Setting waiting mode to false for player {kvp.Key}");
-                   // camController.SetWaitingMode(false);
-                }
-                else
-                {
-                    Debug.LogError($"MyCam component not found on player {kvp.Key}");
-                }
-
-                // Sadece local player'?n kameras?n? aktif et
-                if (kvp.Key == networkRunner.LocalPlayer)
-                {
-                    Camera playerCamera = kvp.Value.GetComponentInChildren<Camera>();
-                    if (playerCamera != null)
-                    {
-                       // playerCamera.gameObject.SetActive(true);
-                        Debug.Log("Local player camera activated");
-                    }
-                    else
-                    {
-                        Debug.LogError("Player camera not found");
-                    }
-                }
-            }
+            // Scene geçiþi için NetworkSceneManager kullan
+            await networkRunner.LoadScene(gameScene);
+            Debug.Log("Successfully transitioned to game scene");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"Failed to load game scene: {e.Message}");
         }
     }
 
-    public void OnJoinSessionRequested(SessionInfo sessionInfo)
+    private void NotifyGameManagerStarted()
     {
-        JoinRoom(sessionInfo);
-    }
-
-    public async void LeaveRoom()
-    {
-        if (networkRunner != null && networkRunner.IsRunning)
+        GameManager gm = FindObjectOfType<GameManager>();
+        if (gm != null)
         {
-            await networkRunner.Shutdown();
+            gm.gameStarted = true;
+            Debug.Log("Game started - GameManager notified!");
         }
-
-        if (lobbyUI != null) lobbyUI.SetActive(true);
-        if (gameUI != null) gameUI.SetActive(false);
-
-        gameStarted = false;
-        isHost = false;
-
-        await StartSessionDiscovery();
     }
 
     public void OnPlayerJoined(NetworkRunner runner, PlayerRef player)
     {
         if (runner != networkRunner) return;
 
-        Debug.Log($"Player joined: {player}");
+        Debug.Log($"Player joined: {player} in state: {currentGameState}");
 
-        if (lobbyUI != null) lobbyUI.SetActive(false);
-        if (inRoomUI != null) inRoomUI.SetActive(true);
-
-        // Host ise start butonunu g?ster
-        if (isHost && startGameButton != null && !gameManagerSpawned)
+        // GameManager spawn et (sadece bir kez)
+        if (isHost && !gameManagerSpawned)
         {
-            startGameButton.SetActive(true);
             runner.Spawn(gameManagerPrefab, Vector3.zero, Quaternion.identity);
             gameManagerSpawned = true;
         }
 
-        
-
-        // Her oyuncu kendi karakterini bekleme alan?nda spawn eder
+        // Player karakterini spawn et
         if (player == runner.LocalPlayer)
         {
-            if (PlayerPrefab == null)
-            {
-                Debug.LogError("PlayerPrefab is null!");
-                return;
-            }
-
-            // Bekleme alan?nda spawn pozisyonu belirle
-            Vector3 waitingPos = GetWaitingAreaPosition(player);
-
-            Debug.Log($"Spawning player at waiting area position: {waitingPos}");
-
-            NetworkObject networkObject = runner.Spawn(
-                PlayerPrefab,
-                waitingPos,
-                Quaternion.identity,
-                player
-            );
-
-            if (networkObject != null)
-            {
-                spawnedCharacters.Add(player, networkObject);
-
-                // Player controller'? al ve bekleme moduna al
-                MyCam camController = networkObject.GetComponentInChildren<MyCam>();
-                if (camController != null)
-                {
-                    //camController.SetWaitingMode(true);
-                }
-                playerCountText.text = $"{spawnedCharacters.Values.Count} / 4";
-                UpdateRoomLobbyUI();
-
-                Debug.Log("Player spawned in waiting area!");
-            }
-            else
-            {
-                Debug.LogError("Failed to spawn player!");
-            }
+            SpawnPlayerCharacter(player, runner);
         }
+
+        UpdateRoomUI();
+    }
+
+    private void SpawnPlayerCharacter(PlayerRef player, NetworkRunner runner)
+    {
+        if (PlayerPrefab == null)
+        {
+            Debug.LogError("PlayerPrefab is null!");
+            return;
+        }
+
+        Vector3 spawnPos;
+
+        // Game state'e göre spawn pozisyonu belirle
+        switch (currentGameState)
+        {
+            case GameState.WaitingRoom:
+                spawnPos = GetWaitingAreaPosition(player);
+                break;
+            case GameState.InGame:
+                spawnPos = GetGameSpawnPosition(player);
+                break;
+            default:
+                spawnPos = Vector3.zero;
+                break;
+        }
+
+        NetworkObject networkObject = runner.Spawn(
+            PlayerPrefab,
+            spawnPos,
+            Quaternion.identity,
+            player
+        );
+
+        if (networkObject != null)
+        {
+            spawnedCharacters[player] = networkObject;
+
+            // Player controller'ý ayarla
+            ConfigurePlayerController(networkObject, currentGameState);
+
+            Debug.Log($"Player spawned at {spawnPos} in {currentGameState} state");
+        }
+        else
+        {
+            Debug.LogError("Failed to spawn player!");
+        }
+    }
+
+    private void ConfigurePlayerController(NetworkObject playerObject, GameState gameState)
+    {
+        MyCam camController = playerObject.GetComponentInChildren<MyCam>();
+        if (camController == null) return;
+
+        switch (gameState)
+        {
+            case GameState.WaitingRoom:
+                // Bekleme modunda hareket kýsýtlý
+                camController.SetWaitingMode(true);
+                break;
+            case GameState.InGame:
+                // Oyun modunda tam kontrol
+                camController.SetWaitingMode(false);
+                break;
+        }
+    }
+
+    private Vector3 GetWaitingAreaPosition(PlayerRef player)
+    {
+        if (waitingAreaSpawnPoints != null && waitingAreaSpawnPoints.Length > 0)
+        {
+            int index = player.RawEncoded % waitingAreaSpawnPoints.Length;
+            return waitingAreaSpawnPoints[index].position;
+        }
+        return defaultWaitingPosition + new Vector3(player.RawEncoded * 2f, 0, 0);
+    }
+
+    private Vector3 GetGameSpawnPosition(PlayerRef player)
+    {
+        // Oyun spawn pozisyonlarý - bu oyun scene'indeki spawn noktalarýndan alýnabilir
+        // Þimdilik basit bir implementasyon
+        return new Vector3(
+            UnityEngine.Random.Range(-10f, 10f),
+            1f,
+            UnityEngine.Random.Range(-10f, 10f)
+        );
     }
 
     public void OnPlayerLeft(NetworkRunner runner, PlayerRef player)
@@ -346,21 +353,105 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
             }
             spawnedCharacters.Remove(player);
         }
+
+        UpdateRoomUI();
     }
 
-    private Vector3 GetWaitingAreaPosition(PlayerRef player)
+    public void OnSceneLoadDone(NetworkRunner runner)
     {
-        // E?er spawn noktalar? tan?mlanm??sa onlar? kullan
-        if (waitingAreaSpawnPoints != null && waitingAreaSpawnPoints.Length > 0)
+        Debug.Log($"Scene load done. Current state: {currentGameState}");
+
+        // Eðer oyun scene'ine geçtiyse, mevcut oyuncularý yeniden spawn et
+        if (currentGameState == GameState.InGame)
         {
-            int index = player.RawEncoded % waitingAreaSpawnPoints.Length;
-            return waitingAreaSpawnPoints[index].position;
+            RespawnAllPlayersInGameScene();
+        }
+    }
+
+    private void RespawnAllPlayersInGameScene()
+    {
+        Debug.Log("Respawning all players in game scene");
+
+        // Mevcut karakterleri temizle
+        foreach (var kvp in spawnedCharacters)
+        {
+            if (kvp.Value != null)
+            {
+                networkRunner.Despawn(kvp.Value);
+            }
+        }
+        spawnedCharacters.Clear();
+
+        // Sadece local player'ý yeniden spawn et (diðerleri kendi callback'lerinde spawn olacak)
+        if (networkRunner.LocalPlayer != null)
+        {
+            SpawnPlayerCharacter(networkRunner.LocalPlayer, networkRunner);
+        }
+    }
+
+    public void OnInput(NetworkRunner runner, NetworkInput input)
+    {
+        if (runner != networkRunner) return;
+
+        // Sadece oyun durumunda input al
+        if (currentGameState != GameState.InGame) return;
+
+        NetworkInputData data = new NetworkInputData
+        {
+            move = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")),
+            jump = Input.GetButtonDown("Jump"),
+            crouch = Input.GetKey(KeyCode.LeftControl),
+            run = Input.GetKey(KeyCode.LeftShift),
+        };
+        input.Set(data);
+    }
+
+    private void UpdateRoomUI()
+    {
+        if (roomNameText != null)
+            roomNameText.text = currentRoomName;
+
+        if (playerCountText != null)
+            playerCountText.text = $"{spawnedCharacters.Count} / {networkRunner?.Config.Simulation.PlayerCount ?? 4}";
+    }
+    public void BackToLobby()
+    {
+        if (lobbyUI != null) lobbyUI.SetActive(true);
+        if (roomUI != null) roomUI.SetActive(false);
+        if (inRoomUI != null) inRoomUI.SetActive(false);
+    }
+    public async void LeaveRoom()
+    {
+        if (networkRunner != null && networkRunner.IsRunning)
+        {
+            await networkRunner.Shutdown();
         }
 
-        // Yoksa default pozisyondan hareketle da??t
-        return defaultWaitingPosition + new Vector3(player.RawEncoded * 2f, 0, 0);
+        SetGameState(GameState.Lobby);
+        isHost = false;
+        spawnedCharacters.Clear();
+
+        await StartSessionDiscovery();
     }
 
+    // UI Methods
+    public void onCreateRoom()
+    {
+        if (roomUI != null) roomUI.SetActive(true);
+        if (lobbyUI != null) lobbyUI.SetActive(false);
+    }
+
+    public async void RefreshSessionList()
+    {
+        if (lobbyRunner != null && lobbyRunner.IsRunning)
+        {
+            await lobbyRunner.Shutdown();
+            await Task.Delay(500);
+        }
+        await StartSessionDiscovery();
+    }
+
+    // Session List Handling
     public void OnSessionListUpdated(NetworkRunner runner, List<SessionInfo> sessionList)
     {
         if (runner != lobbyRunner) return;
@@ -386,46 +477,18 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
                     if (canJoin)
                     {
                         sessionListUI.AddToList(session);
-                        Debug.Log($"Added session to list: {session.Name} ({session.PlayerCount}/{session.MaxPlayers})");
                     }
                 }
             }
         }
     }
 
-    public void OnInput(NetworkRunner runner, NetworkInput input)
+    public void OnJoinSessionRequested(SessionInfo sessionInfo)
     {
-        if (runner != networkRunner) return;
-
-        // Sadece oyun ba?lad?ysa input al
-        if (!gameStarted) return;
-
-        NetworkInputData data = new NetworkInputData
-        {
-            move = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")),
-            jump = Input.GetButtonDown("Jump"),
-            crouch = Input.GetKey(KeyCode.LeftControl),
-            run = Input.GetKey(KeyCode.LeftShift),
-        };
-        input.Set(data);
+        JoinRoom(sessionInfo);
     }
 
-
-    public void onCreateRoom()
-    {
-        if (lobbyUI != null) lobbyUI.SetActive(false);
-        if (roomUI != null) roomUI.SetActive(true);
-    }
-
-    private void UpdateRoomLobbyUI()
-    {
-        // Room lobby UI bile?enlerini g?ncelle
-        roomNameText.text = $"{currentRoomName}";
-        playerCountText.text = $"{spawnedCharacters.Count} / {networkRunner.Config.Simulation.PlayerCount}";
-
-    }
-
-
+    // Cleanup
     private async void OnDestroy()
     {
         if (lobbyRunner != null && lobbyRunner.IsRunning)
@@ -439,7 +502,7 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         }
     }
 
-    // Di?er callback'ler
+    #region Other Network Callbacks
     public void OnConnectedToServer(NetworkRunner runner)
     {
         if (runner == lobbyRunner)
@@ -457,38 +520,33 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         Debug.LogError($"Connection failed: {reason}");
     }
 
-    public void OnConnectRequest(NetworkRunner runner, NetworkRunnerCallbackArgs.ConnectRequest request, byte[] token) { }
-    public void OnCustomAuthenticationResponse(NetworkRunner runner, Dictionary<string, object> data) { }
-
     public void OnDisconnectedFromServer(NetworkRunner runner, NetDisconnectReason reason)
     {
         Debug.Log($"Disconnected: {reason}");
 
         if (runner == networkRunner)
         {
-            if (lobbyUI != null) lobbyUI.SetActive(true);
-            if (gameUI != null) gameUI.SetActive(false);
-
-            gameStarted = false;
+            SetGameState(GameState.Lobby);
             isHost = false;
-
             _ = StartSessionDiscovery();
         }
     }
 
+    public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason)
+    {
+        Debug.Log($"Runner shutdown: {shutdownReason}");
+    }
+
+    // Empty implementations
+    public void OnConnectRequest(NetworkRunner runner, NetworkRunnerCallbackArgs.ConnectRequest request, byte[] token) { }
+    public void OnCustomAuthenticationResponse(NetworkRunner runner, Dictionary<string, object> data) { }
     public void OnHostMigration(NetworkRunner runner, HostMigrationToken hostMigrationToken) { }
     public void OnInputMissing(NetworkRunner runner, PlayerRef player, NetworkInput input) { }
     public void OnObjectEnterAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
     public void OnObjectExitAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
     public void OnReliableDataProgress(NetworkRunner runner, PlayerRef player, ReliableKey key, float progress) { }
     public void OnReliableDataReceived(NetworkRunner runner, PlayerRef player, ReliableKey key, ArraySegment<byte> data) { }
-    public void OnSceneLoadDone(NetworkRunner runner) { }
     public void OnSceneLoadStart(NetworkRunner runner) { }
-
-    public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason)
-    {
-        Debug.Log($"Runner shutdown: {shutdownReason} - Runner: {(runner == lobbyRunner ? "Lobby" : "Game")}");
-    }
-
     public void OnUserSimulationMessage(NetworkRunner runner, SimulationMessagePtr message) { }
+    #endregion
 }

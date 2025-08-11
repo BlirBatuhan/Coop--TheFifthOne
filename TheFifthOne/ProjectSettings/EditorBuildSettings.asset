@@ -6,8 +6,14 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/SyntyStudios/PolygonAdventure/Scenes/Demo.unity
+    path: Assets/Scenes 1/Lobby.unity
+    guid: 63d6bb774192f9143be9b172b906e51e
+  - enabled: 1
+    path: Assets/Scenes 1/WaitingRoom.unity
     guid: e120d0e37ab427a4cb1c20085b85c472
+  - enabled: 1
+    path: Assets/Scenes 1/InGame.unity
+    guid: 76368d0f425b7624782943c33a55b5e4
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

@@ -17,7 +17,7 @@ public class SessionListUIhandler : MonoBehaviour
 
     private void Start()
     {
-        
+        DontDestroyOnLoad(this.gameObject);
         if (spawnPlayer == null)
         {
             spawnPlayer = FindObjectOfType<SpawnPlayer>();
