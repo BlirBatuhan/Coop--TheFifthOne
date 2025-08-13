@@ -3665,9 +3665,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Body: {fileID: 3242867915836576657}
   Head: {fileID: 8311284174878061665}
-  camera: {fileID: 7259312394071436225}
-  _IsWaiting: 1
-  Angle: 0
+  playerCamera: {fileID: 7259312394071436225}
+  mouseSensitivity: 100
+  minLookAngle: -90
+  maxLookAngle: 90
 --- !u!1 &6980609733607278711
 GameObject:
   m_ObjectHideFlags: 0

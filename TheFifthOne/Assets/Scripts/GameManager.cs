@@ -1,228 +1,208 @@
 using UnityEngine;
 using Fusion;
-using System.Collections.Generic;
 using System.Collections;
+using System.Linq;
 
 public class GameManager : NetworkBehaviour
 {
     [Header("Game State")]
-    [Networked] public GameState CurrentGameState { get; set; } = GameState.WaitingRoom;
-    [Networked] public bool gameStarted { get; set; } = false;
-    [Networked] public float gameStartTime { get; set; } = 0f;
+    [Networked] public bool IsGameActive { get; set; } = false;
+    [Networked] public float GameStartTime { get; set; } = 0f;
+    [Networked] public int ConnectedPlayers { get; set; } = 0;
 
     [Header("Game Settings")]
-    [SerializeField] private float gameStartCountdown = 3f;
+    [SerializeField] private float countdownDuration = 5f;
     [SerializeField] private int minPlayersToStart = 2;
+    [SerializeField] private int maxPlayers = 4;
 
-    [Header("Scene References")]
-    [SerializeField] private int gameSceneIndex = 2;
+    [Header("Spawn Settings")]
+    [SerializeField] private Transform[] playerSpawnPoints;
+    [SerializeField] private Vector3 defaultSpawnPosition = Vector3.zero;
 
     // Events
-    public System.Action<GameState> OnGameStateChanged;
-    public System.Action<float> OnCountdownUpdate;
+    public System.Action<float> OnCountdownTick;
     public System.Action OnGameStarted;
+    public System.Action OnGameEnded;
+    public System.Action<int> OnPlayerCountChanged;
 
     // Internal state
-    private GameState previousState;
-    private SpawnPlayer spawnPlayerManager;
-    private bool isCountingDown = false;
+    private bool isCountdownActive = false;
+    private Coroutine countdownCoroutine;
 
     public override void Spawned()
     {
-        Debug.Log("[GameManager] Spawned - Finding SpawnPlayer reference");
+        // Bu GameManager scene'de zaten var, sadece ownership alýyor
+        Debug.Log($"[GameManager] Activated - Owner: {Object.InputAuthority}, HasAuthority: {Object.HasStateAuthority}");
 
-        spawnPlayerManager = FindObjectOfType<SpawnPlayer>();
-        previousState = CurrentGameState;
-
-        // Host olarak spawn olduysak, initial state'i set et
         if (Object.HasStateAuthority)
         {
-            CurrentGameState = GameState.WaitingRoom;
-            gameStarted = false;
-            Debug.Log("[GameManager] Initialized by host");
+            // Host olarak baþlangýç ayarlarý
+            IsGameActive = false;
+            GameStartTime = 0f;
+            ConnectedPlayers = Runner.ActivePlayers.Count();
+
+            Debug.Log("[GameManager] Host initialized game state");
         }
     }
 
     public override void FixedUpdateNetwork()
     {
-        // State deðiþikliklerini kontrol et
-        if (previousState != CurrentGameState)
-        {
-            HandleGameStateChange();
-            previousState = CurrentGameState;
-        }
-
-        // Countdown logic
-        HandleCountdownLogic();
-    }
-
-    private void HandleGameStateChange()
-    {
-        Debug.Log($"[GameManager] Game state changed: {previousState} ? {CurrentGameState}");
-
-        // Event'i fire et
-        OnGameStateChanged?.Invoke(CurrentGameState);
-
-        // State'e göre özel iþlemler
-        switch (CurrentGameState)
-        {
-            case GameState.WaitingRoom:
-                HandleWaitingRoomState();
-                break;
-            case GameState.InGame:
-                HandleInGameState();
-                break;
-        }
-    }
-
-    private void HandleWaitingRoomState()
-    {
-        Debug.Log("[GameManager] Entered Waiting Room state");
-        gameStarted = false;
-        isCountingDown = false;
-    }
-
-    private void HandleInGameState()
-    {
-        Debug.Log("[GameManager] Entered In Game state");
-        gameStarted = true;
-
-        // Game start time'ý kaydet
+        // Player count'u güncel tut
         if (Object.HasStateAuthority)
         {
-            gameStartTime = Runner.SimulationTime;
-        }
-
-        OnGameStarted?.Invoke();
-    }
-
-    private void HandleCountdownLogic()
-    {
-        // Sadece countdown sýrasýnda çalýþýr
-        if (!isCountingDown || !Object.HasStateAuthority) return;
-
-        float elapsedTime = Runner.SimulationTime - gameStartTime;
-        float remainingTime = gameStartCountdown - elapsedTime;
-
-        // Countdown update event'i
-        OnCountdownUpdate?.Invoke(remainingTime);
-
-        // Countdown bitti, oyunu baþlat
-        if (remainingTime <= 0f)
-        {
-            isCountingDown = false;
-            StartGameImmediately();
+            int currentCount = Runner.ActivePlayers.Count();
+            if (currentCount != ConnectedPlayers)
+            {
+                ConnectedPlayers = currentCount;
+                OnPlayerCountChanged?.Invoke(ConnectedPlayers);
+            }
         }
     }
 
-    // Host tarafýndan çaðrýlýr (SpawnPlayer'dan)
-    public void StartGame()
+    // Host oyunu baþlatýr
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    public void RPC_StartGameCountdown()
     {
-        if (!Object.HasStateAuthority)
+        if (!Object.HasStateAuthority) return;
+
+        if (isCountdownActive)
         {
-            Debug.LogWarning("[GameManager] Only host can start the game!");
+            Debug.LogWarning("[GameManager] Countdown already active!");
             return;
         }
 
-        if (CurrentGameState != GameState.WaitingRoom)
+        if (ConnectedPlayers < minPlayersToStart)
         {
-            Debug.LogWarning("[GameManager] Game can only be started from Waiting Room!");
+            Debug.LogWarning($"[GameManager] Need at least {minPlayersToStart} players to start!");
             return;
         }
 
-        // Player sayýsýný kontrol et
-        int playerCount = GetActivePlayerCount();
-        if (playerCount < minPlayersToStart)
-        {
-            Debug.LogWarning($"[GameManager] Need at least {minPlayersToStart} players to start! Current: {playerCount}");
-            return;
-        }
-
-        Debug.Log("[GameManager] Starting game countdown...");
-
-        // Countdown baþlat
+        Debug.Log("[GameManager] Starting countdown...");
         StartCountdown();
     }
 
     private void StartCountdown()
     {
-        if (!Object.HasStateAuthority) return;
+        if (countdownCoroutine != null)
+            StopCoroutine(countdownCoroutine);
 
-        isCountingDown = true;
-        gameStartTime = Runner.SimulationTime;
-
-        Debug.Log($"[GameManager] Countdown started: {gameStartCountdown} seconds");
+        countdownCoroutine = StartCoroutine(CountdownCoroutine());
     }
 
-    private void StartGameImmediately()
+    private IEnumerator CountdownCoroutine()
+    {
+        isCountdownActive = true;
+        float timeRemaining = countdownDuration;
+
+        while (timeRemaining > 0)
+        {
+            OnCountdownTick?.Invoke(timeRemaining);
+            yield return new WaitForSeconds(1f);
+            timeRemaining -= 1f;
+        }
+
+        // Countdown bitti, oyunu baþlat
+        StartGame();
+    }
+
+    private void StartGame()
     {
         if (!Object.HasStateAuthority) return;
 
-        Debug.Log("[GameManager] Starting game immediately - transitioning to game scene");
+        isCountdownActive = false;
+        IsGameActive = true;
+        GameStartTime = Runner.SimulationTime;
 
-        // Game state'i deðiþtir
-        CurrentGameState = GameState.InGame;
+        Debug.Log("[GameManager] Game started!");
+        OnGameStarted?.Invoke();
 
-        // SpawnPlayer'a scene geçiþini bildir
-        if (spawnPlayerManager != null)
-        {
-            spawnPlayerManager.TransitionToGameScene();
-        }
-        else
-        {
-            Debug.LogError("[GameManager] SpawnPlayer reference is null!");
-        }
+        // Tüm clientlara oyun baþladýðýný bildir
+        RPC_NotifyGameStarted();
     }
 
-    // RPC for immediate game start (debug/admin purposes)
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-    public void RPC_ForceStartGame()
+    public void RPC_NotifyGameStarted()
     {
-        if (Object.HasStateAuthority)
+        OnGameStarted?.Invoke();
+        Debug.Log("[GameManager] Game start notification received");
+    }
+
+    // Oyunu sonlandýr
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    public void RPC_EndGame()
+    {
+        if (!Object.HasStateAuthority) return;
+
+        IsGameActive = false;
+        isCountdownActive = false;
+
+        if (countdownCoroutine != null)
         {
-            StartGameImmediately();
+            StopCoroutine(countdownCoroutine);
+            countdownCoroutine = null;
         }
+
+        Debug.Log("[GameManager] Game ended");
+        OnGameEnded?.Invoke();
+    }
+
+    // Spawn pozisyonu al
+    public Vector3 GetSpawnPosition(int playerIndex)
+    {
+        if (playerSpawnPoints != null && playerSpawnPoints.Length > 0)
+        {
+            int spawnIndex = playerIndex % playerSpawnPoints.Length;
+            return playerSpawnPoints[spawnIndex].position;
+        }
+
+        // Default spawn with offset
+        return defaultSpawnPosition + new Vector3(playerIndex * 3f, 0, 0);
     }
 
     // Utility methods
-    private int GetActivePlayerCount()
-    {
-        if (Runner == null) return 0;
-
-        int count = 0;
-        foreach (var player in Runner.ActivePlayers)
-        {
-            if (Runner.GetPlayerObject(player))
-                count++;
-        }
-        return count;
-    }
-
     public float GetGameDuration()
     {
-        if (!gameStarted) return 0f;
-        return Runner.SimulationTime - gameStartTime;
+        if (!IsGameActive || GameStartTime == 0f) return 0f;
+        return Runner.SimulationTime - GameStartTime;
     }
 
     public bool CanStartGame()
     {
         return Object.HasStateAuthority &&
-               CurrentGameState == GameState.WaitingRoom &&
-               GetActivePlayerCount() >= minPlayersToStart &&
-               !isCountingDown;
+               !IsGameActive &&
+               !isCountdownActive &&
+               ConnectedPlayers >= minPlayersToStart;
     }
 
-    public bool IsCountingDown()
+    public bool IsCountdownActive()
     {
-        return isCountingDown;
+        return isCountdownActive;
     }
 
-    public float GetCountdownRemaining()
+    public bool IsOwner()
     {
-        if (!isCountingDown) return 0f;
+        return Object != null && Object.HasStateAuthority;
+    }
 
-        float elapsed = Runner.SimulationTime - gameStartTime;
-        return Mathf.Max(0f, gameStartCountdown - elapsed);
+    public int GetConnectedPlayerCount()
+    {
+        return ConnectedPlayers;
+    }
+
+    public int GetMaxPlayers()
+    {
+        return maxPlayers;
+    }
+
+    public int GetMinPlayersToStart()
+    {
+        return minPlayersToStart;
+    }
+
+    private void UpdatePlayerCount(int count)
+    {
+        // Bu metod artýk gereksiz, FixedUpdateNetwork'te otomatik güncelleniyor
+        Debug.Log($"[GameManager] Player count updated: {count}");
     }
 
     // Debug methods
@@ -231,43 +211,49 @@ public class GameManager : NetworkBehaviour
     {
         if (Application.isPlaying && Object.HasStateAuthority)
         {
-            StartGameImmediately();
+            StartGame();
         }
     }
 
-    [ContextMenu("Reset to Waiting Room")]
-    private void Debug_ResetToWaitingRoom()
+    [ContextMenu("Start Countdown")]
+    private void Debug_StartCountdown()
     {
         if (Application.isPlaying && Object.HasStateAuthority)
         {
-            CurrentGameState = GameState.WaitingRoom;
-            gameStarted = false;
-            isCountingDown = false;
+            RPC_StartGameCountdown();
         }
     }
 
-    // Public getters
-    public bool IsHost()
+    [ContextMenu("End Game")]
+    private void Debug_EndGame()
     {
-        return Object != null && Object.HasStateAuthority;
-    }
-
-    public bool IsGameActive()
-    {
-        return CurrentGameState == GameState.InGame && gameStarted;
-    }
-
-    public bool IsWaitingRoom()
-    {
-        return CurrentGameState == GameState.WaitingRoom;
+        if (Application.isPlaying && Object.HasStateAuthority)
+        {
+            RPC_EndGame();
+        }
     }
 
     // Cleanup
     public override void Despawned(NetworkRunner runner, bool hasState)
     {
-        Debug.Log("[GameManager] Despawned");
-        OnGameStateChanged = null;
-        OnCountdownUpdate = null;
+        if (countdownCoroutine != null)
+        {
+            StopCoroutine(countdownCoroutine);
+        }
+
+        OnCountdownTick = null;
         OnGameStarted = null;
+        OnGameEnded = null;
+        OnPlayerCountChanged = null;
+
+        Debug.Log("[GameManager] Despawned");
+    }
+
+    private void OnDestroy()
+    {
+        if (countdownCoroutine != null)
+        {
+            StopCoroutine(countdownCoroutine);
+        }
     }
 }

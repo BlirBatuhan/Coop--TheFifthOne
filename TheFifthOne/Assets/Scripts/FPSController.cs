@@ -1,5 +1,4 @@
 using Fusion;
-using System.Runtime.CompilerServices;
 using UnityEngine;
 
 public class MyCam : NetworkBehaviour
@@ -7,266 +6,123 @@ public class MyCam : NetworkBehaviour
     [Header("Camera Settings")]
     public Transform Body;
     public Transform Head;
-    public Camera camera;
+    public Camera playerCamera;
     public float mouseSensitivity = 100f;
 
-    [Header("Movement Restrictions")]
-    public bool restrictMovementInWaiting = true;
+    [Header("Movement Settings")]
+    public float minLookAngle = -90f;
+    public float maxLookAngle = 90f;
 
     // Input variables
-    private float MouseX;
-    private float MouseY;
-    private float Angle;
+    private float mouseX;
+    private float mouseY;
+    private float verticalRotation;
 
-    // State management
+    // State
     private bool isLocalPlayer;
-    private GameState currentCameraState = GameState.Lobby;
-    private GameState previousCameraState = GameState.Lobby;
-
-    // References
-    private SpawnPlayer spawnPlayerManager;
-    private GameManager gameManager;
-
-    // Camera objects
-    private Camera lobbyCamera;
-    private AudioListener lobbyAudioListener;
     private AudioListener playerAudioListener;
-
-    public void Awake()
-    {
-        // Player kameralarý baþlangýçta kapalý
-        if (camera != null)
-        {
-            camera.enabled = false;
-            playerAudioListener = camera.GetComponent<AudioListener>();
-            if (playerAudioListener != null)
-            {
-                playerAudioListener.enabled = false;
-            }
-        }
-
-        // Lobby kamerasý referansýný bul
-        FindLobbyCamera();
-    }
-
-    private void FindLobbyCamera()
-    {
-        GameObject lobbyCamObject = GameObject.Find("LobbyCamera");
-        if (lobbyCamObject != null)
-        {
-            lobbyCamera = lobbyCamObject.GetComponent<Camera>();
-            lobbyAudioListener = lobbyCamObject.GetComponent<AudioListener>();
-        }
-    }
 
     public override void Spawned()
     {
         isLocalPlayer = Object.HasInputAuthority;
 
-        // Manager referanslarýný al
-        spawnPlayerManager = FindObjectOfType<SpawnPlayer>();
-        gameManager = FindObjectOfType<GameManager>();
+        // Audio Listener referansýný al
+        if (playerCamera != null)
+        {
+            playerAudioListener = playerCamera.GetComponent<AudioListener>();
+        }
 
-        Debug.Log($"[MyCam SPAWN] Player: {Object.InputAuthority}, isLocalPlayer: {isLocalPlayer}");
+        Debug.Log($"[MyCam] Player spawned - IsLocal: {isLocalPlayer}");
 
-        // Baþlangýç kamera state'ini belirle
-        DetermineInitialCameraState();
+        // Kamera durumunu ayarla
+        SetupCamera();
+    }
 
-        // Local player için kamera kurulumu
+    private void SetupCamera()
+    {
         if (isLocalPlayer)
         {
-            SetupCameraForCurrentState();
+            // Local player - kamerayý aç
+            EnablePlayerCamera();
+            SetMouseLocked(true);
+            Debug.Log("[MyCam] Local player camera enabled");
         }
         else
         {
-            // Remote player kamerasý her zaman kapalý
+            // Remote player - kamerayý kapat
             DisablePlayerCamera();
-        }
-    }
-
-    private void DetermineInitialCameraState()
-    {
-        // SpawnPlayer'dan current game state'i al
-        if (spawnPlayerManager != null)
-        {
-            // SpawnPlayer'daki currentGameState'e eriþim için public property eklemen gerekebilir
-            // Þimdilik GameManager'dan kontrol edelim
-            if (gameManager != null && gameManager.gameStarted)
-            {
-                currentCameraState = GameState.InGame;
-            }
-            else
-            {
-                currentCameraState = GameState.WaitingRoom;
-            }
-        }
-        else
-        {
-            currentCameraState = GameState.WaitingRoom;
-        }
-
-        previousCameraState = currentCameraState;
-        Debug.Log($"[MyCam] Initial camera state: {currentCameraState}");
-    }
-
-    void Update()
-    {
-        if (!isLocalPlayer) return;
-
-        // Game state deðiþikliklerini kontrol et
-        CheckForStateChanges();
-
-        // Debug controls
-        HandleDebugInput();
-    }
-
-    private void CheckForStateChanges()
-    {
-        GameState newState = GetCurrentGameState();
-
-        if (newState != currentCameraState)
-        {
-            Debug.Log($"[MyCam STATE CHANGE] {currentCameraState} ? {newState}");
-
-            previousCameraState = currentCameraState;
-            currentCameraState = newState;
-
-            SetupCameraForCurrentState();
-        }
-    }
-
-    private GameState GetCurrentGameState()
-    {
-        // GameManager'dan oyun durumunu kontrol et
-        if (gameManager != null && gameManager.gameStarted)
-        {
-            return GameState.InGame;
-        }
-
-        // SpawnPlayer'dan durumu kontrol et (eðer public property varsa)
-        // Þimdilik GameManager'a göre karar verelim
-        return GameState.WaitingRoom;
-    }
-
-    private void SetupCameraForCurrentState()
-    {
-        switch (currentCameraState)
-        {
-            case GameState.Lobby:
-                SetupLobbyMode();
-                break;
-            case GameState.WaitingRoom:
-                SetupWaitingRoomMode();
-                break;
-            case GameState.InGame:
-                SetupGameMode();
-                break;
-        }
-    }
-
-    private void SetupLobbyMode()
-    {
-        Debug.Log("[MyCam] Setting up Lobby Mode");
-
-        DisablePlayerCamera();
-        EnableLobbyCamera();
-
-        // Mouse serbest
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible = true;
-    }
-
-    private void SetupWaitingRoomMode()
-    {
-        Debug.Log("[MyCam] Setting up Waiting Room Mode");
-
-        DisablePlayerCamera();
-        EnableLobbyCamera();
-
-        // Mouse serbest (UI için)
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible = true;
-    }
-
-    private void SetupGameMode()
-    {
-        Debug.Log("[MyCam] Setting up Game Mode");
-
-        DisableLobbyCamera();
-        EnablePlayerCamera();
-
-        // Mouse kilitli
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
-    }
-
-    private void EnableLobbyCamera()
-    {
-        if (lobbyCamera != null)
-        {
-            lobbyCamera.gameObject.SetActive(true);
-            lobbyCamera.enabled = true;
-
-            if (lobbyAudioListener != null)
-            {
-                lobbyAudioListener.enabled = true;
-            }
-
-            Debug.Log("[MyCam] Lobby camera enabled");
-        }
-        else
-        {
-            Debug.LogWarning("[MyCam] Lobby camera not found!");
-            FindLobbyCamera(); // Tekrar dene
-        }
-    }
-
-    private void DisableLobbyCamera()
-    {
-        if (lobbyCamera != null)
-        {
-            lobbyCamera.gameObject.SetActive(false);
-            lobbyCamera.enabled = false;
-
-            if (lobbyAudioListener != null)
-            {
-                lobbyAudioListener.enabled = false;
-            }
-
-            Debug.Log("[MyCam] Lobby camera disabled");
+            Debug.Log("[MyCam] Remote player camera disabled");
         }
     }
 
     private void EnablePlayerCamera()
     {
-        if (camera != null)
+        if (playerCamera != null)
         {
-            camera.enabled = true;
+            playerCamera.enabled = true;
 
             if (playerAudioListener != null)
-            {
                 playerAudioListener.enabled = true;
-            }
-
-            Debug.Log("[MyCam] Player camera enabled");
-        }
-        else
-        {
-            Debug.LogError("[MyCam] Player camera is null!");
         }
     }
 
     private void DisablePlayerCamera()
     {
-        if (camera != null)
+        if (playerCamera != null)
         {
-            camera.enabled = false;
+            playerCamera.enabled = false;
 
             if (playerAudioListener != null)
-            {
                 playerAudioListener.enabled = false;
-            }
         }
+    }
+
+    private void SetMouseLocked(bool locked)
+    {
+        if (locked)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+        else
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+    }
+
+    void Update()
+    {
+        // Sadece local player için input handling
+        if (!isLocalPlayer) return;
+
+        HandleDebugInput();
+    }
+
+    void LateUpdate()
+    {
+        // Sadece local player için mouse look
+        if (!isLocalPlayer) return;
+
+        // Mouse locked deðilse mouse look yapma
+        if (Cursor.lockState != CursorLockMode.Locked) return;
+
+        HandleMouseLook();
+    }
+
+    private void HandleMouseLook()
+    {
+        // Mouse input al
+        mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
+        mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime;
+
+        // Horizontal rotation (Body)
+        Body.Rotate(Vector3.up * mouseX);
+
+        // Vertical rotation (Head)
+        verticalRotation -= mouseY;
+        verticalRotation = Mathf.Clamp(verticalRotation, minLookAngle, maxLookAngle);
+        Head.localRotation = Quaternion.Euler(verticalRotation, 0, 0);
     }
 
     private void HandleDebugInput()
@@ -277,84 +133,44 @@ public class MyCam : NetworkBehaviour
             ToggleMouseLock();
         }
 
-        // Debug: F1 ile manuel kamera geçiþi
+        // F1 debug bilgi
         if (Input.GetKeyDown(KeyCode.F1))
         {
-            Debug.Log($"[DEBUG] Current camera state: {currentCameraState}");
+            Debug.Log($"[MyCam Debug] IsLocal: {isLocalPlayer}, Camera Enabled: {playerCamera?.enabled}, Mouse Locked: {Cursor.lockState}");
         }
     }
 
     private void ToggleMouseLock()
     {
-        if (currentCameraState == GameState.InGame)
-        {
-            if (Cursor.lockState == CursorLockMode.Locked)
-            {
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-                Debug.Log("[MyCam] Mouse unlocked");
-            }
-            else
-            {
-                Cursor.lockState = CursorLockMode.Locked;
-                Cursor.visible = false;
-                Debug.Log("[MyCam] Mouse locked");
-            }
-        }
+        bool isLocked = Cursor.lockState == CursorLockMode.Locked;
+        SetMouseLocked(!isLocked);
+        Debug.Log($"[MyCam] Mouse {(isLocked ? "unlocked" : "locked")}");
     }
 
-    void LateUpdate()
-    {
-        // Sadece local player ve oyun modunda mouse look
-        if (!isLocalPlayer || currentCameraState != GameState.InGame)
-            return;
-
-        // Mouse locked deðilse mouse look yapma
-        if (Cursor.lockState != CursorLockMode.Locked)
-            return;
-
-        HandleMouseLook();
-    }
-
-    private void HandleMouseLook()
-    {
-        MouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
-        Body.Rotate(Vector3.up, MouseX);
-
-        MouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime;
-        Angle -= MouseY;
-        Angle = Mathf.Clamp(Angle, -90f, 90f); // Daha geniþ açý aralýðý
-        Head.localRotation = Quaternion.Euler(Angle, 0, 0);
-    }
-
-    // Public methods - SpawnPlayer tarafýndan çaðrýlabilir
-    public void SetWaitingMode(bool isWaiting)
-    {
-        if (!isLocalPlayer) return;
-
-        GameState targetState = isWaiting ? GameState.WaitingRoom : GameState.InGame;
-
-        if (targetState != currentCameraState)
-        {
-            Debug.Log($"[MyCam] SetWaitingMode: {isWaiting} ? State: {targetState}");
-            currentCameraState = targetState;
-            SetupCameraForCurrentState();
-        }
-    }
-
-    public GameState GetCurrentCameraState()
-    {
-        return currentCameraState;
-    }
-
-    public bool IsInGameMode()
-    {
-        return currentCameraState == GameState.InGame;
-    }
-
+    // Public methods
     public bool IsLocalPlayerCamera()
     {
         return isLocalPlayer;
+    }
+
+    public bool IsCameraEnabled()
+    {
+        return playerCamera != null && playerCamera.enabled;
+    }
+
+    public void ForceEnableCamera()
+    {
+        if (isLocalPlayer)
+        {
+            EnablePlayerCamera();
+            SetMouseLocked(true);
+        }
+    }
+
+    public void ForceDisableCamera()
+    {
+        DisablePlayerCamera();
+        SetMouseLocked(false);
     }
 
     // Cleanup
@@ -363,6 +179,16 @@ public class MyCam : NetworkBehaviour
         if (isLocalPlayer)
         {
             DisablePlayerCamera();
+            SetMouseLocked(false);
+        }
+    }
+
+    public override void Despawned(NetworkRunner runner, bool hasState)
+    {
+        if (isLocalPlayer)
+        {
+            DisablePlayerCamera();
+            SetMouseLocked(false);
         }
     }
 }

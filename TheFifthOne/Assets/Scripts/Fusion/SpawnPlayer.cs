@@ -10,7 +10,6 @@ using TMPro;
 public enum GameState
 {
     Lobby,
-    WaitingRoom,
     InGame
 }
 
@@ -18,35 +17,28 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
 {
     private NetworkRunner networkRunner;
     private NetworkRunner lobbyRunner;
-    [SerializeField] private NetworkObject gameManagerPrefab;
-    private bool gameManagerSpawned = false;
 
     [SerializeField] public GameObject PlayerPrefab;
     [SerializeField] private SessionListUIhandler sessionListUI;
+    [SerializeField] private bool isHost = false; // Host olup olmadýðýný kontrol etmek için
+
+    // UI References
     [SerializeField] private GameObject lobbyUI;
     [SerializeField] private GameObject gameUI;
     [SerializeField] private GameObject roomUI;
-    [SerializeField] private GameObject inRoomUI;
-    [SerializeField] private GameObject startGameButton;
 
-    // Scene referanslarý
-    [SerializeField] private int waitingRoomSceneIndex = 1; // Bekleme alaný scene'i
-    [SerializeField] private int gameSceneIndex = 2; // Oyun scene'i
 
-    // Bekleme alaný spawn pozisyonlarý
-    [SerializeField] private Transform[] waitingAreaSpawnPoints;
-    [SerializeField] private Vector3 defaultWaitingPosition = new Vector3(0, 1f, 0);
+    // Scene Settings
+    [SerializeField] private int gameSceneIndex = 1;
 
-    [Header("Room UI Elements")]
+    // Room UI Elements
+    [Header("Room UI")]
     [SerializeField] private TextMeshProUGUI roomNameText;
     [SerializeField] private TextMeshProUGUI playerCountText;
     private string currentRoomName = "";
 
-    // Game State Management
+    // State
     private GameState currentGameState = GameState.Lobby;
-    private bool isHost = false;
-
-    // Oyuncularýn karakterlerini tutmak için
     private Dictionary<PlayerRef, NetworkObject> spawnedCharacters = new Dictionary<PlayerRef, NetworkObject>();
 
     private async void Start()
@@ -60,7 +52,7 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     {
         currentGameState = newState;
         UpdateUIBasedOnGameState();
-        Debug.Log($"Game state changed to: {currentGameState}");
+        Debug.Log($"Game state: {currentGameState}");
     }
 
     private void UpdateUIBasedOnGameState()
@@ -69,18 +61,12 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         if (lobbyUI != null) lobbyUI.SetActive(false);
         if (gameUI != null) gameUI.SetActive(false);
         if (roomUI != null) roomUI.SetActive(false);
-        if (inRoomUI != null) inRoomUI.SetActive(false);
-        if (startGameButton != null) startGameButton.SetActive(false);
 
-        // Current state'e göre UI'larý aç
+        // State'e göre UI aç
         switch (currentGameState)
         {
             case GameState.Lobby:
                 if (lobbyUI != null) lobbyUI.SetActive(true);
-                break;
-            case GameState.WaitingRoom:
-                if (inRoomUI != null) inRoomUI.SetActive(true);
-                if (isHost && startGameButton != null) startGameButton.SetActive(true);
                 break;
             case GameState.InGame:
                 if (gameUI != null) gameUI.SetActive(true);
@@ -91,9 +77,7 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     private async Task StartSessionDiscovery()
     {
         if (lobbyRunner != null && lobbyRunner.IsRunning)
-        {
             await lobbyRunner.Shutdown();
-        }
 
         GameObject lobbyObject = new GameObject("LobbyRunner");
         lobbyObject.transform.SetParent(this.transform);
@@ -103,53 +87,39 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         try
         {
             await lobbyRunner.JoinSessionLobby(SessionLobby.Shared);
-            Debug.Log("Session discovery started successfully");
+            Debug.Log("Session discovery started");
         }
         catch (Exception e)
         {
-            Debug.LogError($"Failed to start session discovery: {e.Message}");
+            Debug.LogError($"Session discovery failed: {e.Message}");
         }
     }
 
     public async void CreateRoom(string roomName, int maxPlayers = 4)
     {
         if (lobbyRunner != null && lobbyRunner.IsRunning)
-        {
             await lobbyRunner.Shutdown();
-        }
-
-        isHost = true;
-        SetGameState(GameState.WaitingRoom);
-
-        await StartNetworkRunner(roomName, maxPlayers, true);
+        isHost = true; // Host olarak ayarla
+        await StartNetworkRunner(roomName, maxPlayers);
     }
 
     public async void JoinRoom(SessionInfo sessionInfo)
     {
         if (lobbyRunner != null && lobbyRunner.IsRunning)
-        {
             await lobbyRunner.Shutdown();
-        }
 
-        isHost = false;
-        SetGameState(GameState.WaitingRoom);
-
-        await StartNetworkRunner(sessionInfo.Name, 4, false);
+        await StartNetworkRunner(sessionInfo.Name, 4);
     }
 
-    private async Task StartNetworkRunner(string sessionName, int maxPlayers, bool isCreating)
+    private async Task StartNetworkRunner(string sessionName, int maxPlayers)
     {
         networkRunner = gameObject.GetComponent<NetworkRunner>();
         if (networkRunner == null)
-        {
             networkRunner = gameObject.AddComponent<NetworkRunner>();
-        }
 
-        networkRunner.ProvideInput = (currentGameState == GameState.InGame);
+        networkRunner.ProvideInput = true; 
         networkRunner.AddCallbacks(this);
-
-        // Bekleme alaný scene'inde baþlat
-        var scene = SceneRef.FromIndex(waitingRoomSceneIndex);
+        var scene = SceneRef.FromIndex(gameSceneIndex);
         currentRoomName = sessionName;
 
         try
@@ -165,70 +135,39 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
                 IsOpen = true
             });
 
-            Debug.Log($"Network runner started in waiting room: {sessionName}");
+            SetGameState(GameState.InGame);
+            Debug.Log($"Network runner started: {sessionName}");
         }
         catch (Exception e)
         {
-            Debug.LogError($"Failed to start network runner: {e.Message}");
+            Debug.LogError($"Network runner failed: {e.Message}");
             SetGameState(GameState.Lobby);
             await StartSessionDiscovery();
         }
     }
 
-    // Host tarafýndan oyunu baþlat
-    public void StartGame()
+    // Host oyunu baþlatýr
+    public async void StartGame()
     {
-        if (!isHost || currentGameState != GameState.WaitingRoom) return;
+        if (currentGameState != GameState.Lobby) return;
 
-        Debug.Log("Host requesting game start via GameManager");
+        Debug.Log("Host starting game...");
 
-        // GameManager'a oyun baþlatma isteði gönder
-        GameManager gm = FindObjectOfType<GameManager>();
-        if (gm != null)
-        {
-            gm.StartGame(); // GameManager countdown'u baþlatacak
-        }
-        else
-        {
-            Debug.LogError("GameManager not found!");
-        }
-    }
-
-    // GameManager tarafýndan çaðrýlýr
-    public async void TransitionToGameScene()
-    {
-        if (!isHost) return;
-
-        Debug.Log("Transitioning to game scene...");
-
-        // Game state'i deðiþtir
         SetGameState(GameState.InGame);
-
-        // Input handling'i aktif et
-        networkRunner.ProvideInput = true;
+        networkRunner.ProvideInput = true; // Input'u aktif et
 
         // Oyun scene'ine geç
         var gameScene = SceneRef.FromIndex(gameSceneIndex);
 
         try
         {
-            // Scene geçiþi için NetworkSceneManager kullan
             await networkRunner.LoadScene(gameScene);
-            Debug.Log("Successfully transitioned to game scene");
+            Debug.Log("Transitioned to game scene");
         }
-        catch (System.Exception e)
+        catch (Exception e)
         {
-            Debug.LogError($"Failed to load game scene: {e.Message}");
-        }
-    }
-
-    private void NotifyGameManagerStarted()
-    {
-        GameManager gm = FindObjectOfType<GameManager>();
-        if (gm != null)
-        {
-            gm.gameStarted = true;
-            Debug.Log("Game started - GameManager notified!");
+            Debug.LogError($"Scene transition failed: {e.Message}");
+            SetGameState(GameState.Lobby);
         }
     }
 
@@ -236,47 +175,21 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     {
         if (runner != networkRunner) return;
 
-        Debug.Log($"Player joined: {player} in state: {currentGameState}");
+        Debug.Log($"Player joined: {player}");
 
-        // GameManager spawn et (sadece bir kez)
-        if (isHost && !gameManagerSpawned)
-        {
-            runner.Spawn(gameManagerPrefab, Vector3.zero, Quaternion.identity);
-            gameManagerSpawned = true;
-        }
-
-        // Player karakterini spawn et
+        // Oyuncuyu spawn et
         if (player == runner.LocalPlayer)
         {
             SpawnPlayerCharacter(player, runner);
         }
-
         UpdateRoomUI();
     }
 
     private void SpawnPlayerCharacter(PlayerRef player, NetworkRunner runner)
     {
-        if (PlayerPrefab == null)
-        {
-            Debug.LogError("PlayerPrefab is null!");
-            return;
-        }
+        if (PlayerPrefab == null) return;
 
-        Vector3 spawnPos;
-
-        // Game state'e göre spawn pozisyonu belirle
-        switch (currentGameState)
-        {
-            case GameState.WaitingRoom:
-                spawnPos = GetWaitingAreaPosition(player);
-                break;
-            case GameState.InGame:
-                spawnPos = GetGameSpawnPosition(player);
-                break;
-            default:
-                spawnPos = Vector3.zero;
-                break;
-        }
+        Vector3 spawnPos = GetSpawnPosition(player);
 
         NetworkObject networkObject = runner.Spawn(
             PlayerPrefab,
@@ -288,55 +201,26 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         if (networkObject != null)
         {
             spawnedCharacters[player] = networkObject;
+            Debug.Log($"Player spawned: {player}");
+        }
+    }
 
-            // Player controller'ý ayarla
-            ConfigurePlayerController(networkObject, currentGameState);
-
-            Debug.Log($"Player spawned at {spawnPos} in {currentGameState} state");
+    private Vector3 GetSpawnPosition(PlayerRef player)
+    {
+        if (currentGameState == GameState.InGame)
+        {
+            // Oyun spawn pozisyonlarý
+            return new Vector3(
+                UnityEngine.Random.Range(-10f, 10f),
+                1f,
+                UnityEngine.Random.Range(-10f, 10f)
+            );
         }
         else
         {
-            Debug.LogError("Failed to spawn player!");
+            // Lobby spawn pozisyonlarý
+            return new Vector3(player.RawEncoded * 2f, 0, 0);
         }
-    }
-
-    private void ConfigurePlayerController(NetworkObject playerObject, GameState gameState)
-    {
-        MyCam camController = playerObject.GetComponentInChildren<MyCam>();
-        if (camController == null) return;
-
-        switch (gameState)
-        {
-            case GameState.WaitingRoom:
-                // Bekleme modunda hareket kýsýtlý
-                camController.SetWaitingMode(true);
-                break;
-            case GameState.InGame:
-                // Oyun modunda tam kontrol
-                camController.SetWaitingMode(false);
-                break;
-        }
-    }
-
-    private Vector3 GetWaitingAreaPosition(PlayerRef player)
-    {
-        if (waitingAreaSpawnPoints != null && waitingAreaSpawnPoints.Length > 0)
-        {
-            int index = player.RawEncoded % waitingAreaSpawnPoints.Length;
-            return waitingAreaSpawnPoints[index].position;
-        }
-        return defaultWaitingPosition + new Vector3(player.RawEncoded * 2f, 0, 0);
-    }
-
-    private Vector3 GetGameSpawnPosition(PlayerRef player)
-    {
-        // Oyun spawn pozisyonlarý - bu oyun scene'indeki spawn noktalarýndan alýnabilir
-        // Þimdilik basit bir implementasyon
-        return new Vector3(
-            UnityEngine.Random.Range(-10f, 10f),
-            1f,
-            UnityEngine.Random.Range(-10f, 10f)
-        );
     }
 
     public void OnPlayerLeft(NetworkRunner runner, PlayerRef player)
@@ -348,9 +232,7 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         if (spawnedCharacters.TryGetValue(player, out NetworkObject networkObject))
         {
             if (networkObject != null)
-            {
                 runner.Despawn(networkObject);
-            }
             spawnedCharacters.Remove(player);
         }
 
@@ -359,42 +241,42 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
 
     public void OnSceneLoadDone(NetworkRunner runner)
     {
-        Debug.Log($"Scene load done. Current state: {currentGameState}");
+        Debug.Log($"Scene loaded - State: {currentGameState}");
 
-        // Eðer oyun scene'ine geçtiyse, mevcut oyuncularý yeniden spawn et
         if (currentGameState == GameState.InGame)
         {
-            RespawnAllPlayersInGameScene();
+            // GameManager'a ownership ver (sadece host)
+            if (isHost)
+            {
+                AssignGameManagerAuthority();
+            }
         }
     }
 
-    private void RespawnAllPlayersInGameScene()
+    private void AssignGameManagerAuthority()
     {
-        Debug.Log("Respawning all players in game scene");
-
-        // Mevcut karakterleri temizle
-        foreach (var kvp in spawnedCharacters)
+        GameManager gameManager = FindObjectOfType<GameManager>();
+        if (gameManager != null && gameManager.Object != null)
         {
-            if (kvp.Value != null)
+            if (gameManager.Object.HasStateAuthority == false)
             {
-                networkRunner.Despawn(kvp.Value);
+                gameManager.Object.RequestStateAuthority();
+                Debug.Log("StateAuthority requested for GameManager.");
+            }
+            else
+            {
+                Debug.Log("Already has StateAuthority for GameManager.");
             }
         }
-        spawnedCharacters.Clear();
-
-        // Sadece local player'ý yeniden spawn et (diðerleri kendi callback'lerinde spawn olacak)
-        if (networkRunner.LocalPlayer != null)
+        else
         {
-            SpawnPlayerCharacter(networkRunner.LocalPlayer, networkRunner);
+            Debug.LogError("GameManager not found in scene!");
         }
     }
 
     public void OnInput(NetworkRunner runner, NetworkInput input)
     {
-        if (runner != networkRunner) return;
-
-        // Sadece oyun durumunda input al
-        if (currentGameState != GameState.InGame) return;
+        if (runner != networkRunner || currentGameState != GameState.InGame) return;
 
         NetworkInputData data = new NetworkInputData
         {
@@ -414,23 +296,21 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         if (playerCountText != null)
             playerCountText.text = $"{spawnedCharacters.Count} / {networkRunner?.Config.Simulation.PlayerCount ?? 4}";
     }
+
     public void BackToLobby()
     {
         if (lobbyUI != null) lobbyUI.SetActive(true);
         if (roomUI != null) roomUI.SetActive(false);
-        if (inRoomUI != null) inRoomUI.SetActive(false);
     }
+
     public async void LeaveRoom()
     {
         if (networkRunner != null && networkRunner.IsRunning)
-        {
             await networkRunner.Shutdown();
-        }
 
         SetGameState(GameState.Lobby);
-        isHost = false;
-        spawnedCharacters.Clear();
 
+        spawnedCharacters.Clear();
         await StartSessionDiscovery();
     }
 
@@ -454,30 +334,21 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     // Session List Handling
     public void OnSessionListUpdated(NetworkRunner runner, List<SessionInfo> sessionList)
     {
-        if (runner != lobbyRunner) return;
+        if (runner != lobbyRunner || sessionListUI == null) return;
 
-        Debug.Log($"Session list updated: {sessionList.Count} sessions found");
+        sessionListUI.ClearList();
 
-        if (sessionListUI != null)
+        if (sessionList.Count == 0)
         {
-            sessionListUI.ClearList();
-
-            if (sessionList.Count == 0)
+            sessionListUI.OnNoSessionsFound();
+        }
+        else
+        {
+            foreach (var session in sessionList)
             {
-                sessionListUI.OnNoSessionsFound();
-            }
-            else
-            {
-                foreach (var session in sessionList)
+                if (session.IsOpen && session.PlayerCount < session.MaxPlayers && session.IsVisible)
                 {
-                    bool canJoin = session.IsOpen &&
-                                   session.PlayerCount < session.MaxPlayers &&
-                                   session.IsVisible;
-
-                    if (canJoin)
-                    {
-                        sessionListUI.AddToList(session);
-                    }
+                    sessionListUI.AddToList(session);
                 }
             }
         }
@@ -492,27 +363,15 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     private async void OnDestroy()
     {
         if (lobbyRunner != null && lobbyRunner.IsRunning)
-        {
             await lobbyRunner.Shutdown();
-        }
-
         if (networkRunner != null && networkRunner.IsRunning)
-        {
             await networkRunner.Shutdown();
-        }
     }
 
-    #region Other Network Callbacks
+    #region Network Callbacks
     public void OnConnectedToServer(NetworkRunner runner)
     {
-        if (runner == lobbyRunner)
-        {
-            Debug.Log("Connected to lobby");
-        }
-        else if (runner == networkRunner)
-        {
-            Debug.Log("Connected to game session");
-        }
+        Debug.Log(runner == lobbyRunner ? "Connected to lobby" : "Connected to session");
     }
 
     public void OnConnectFailed(NetworkRunner runner, NetAddress remoteAddress, NetConnectFailedReason reason)
@@ -523,11 +382,9 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     public void OnDisconnectedFromServer(NetworkRunner runner, NetDisconnectReason reason)
     {
         Debug.Log($"Disconnected: {reason}");
-
         if (runner == networkRunner)
         {
             SetGameState(GameState.Lobby);
-            isHost = false;
             _ = StartSessionDiscovery();
         }
     }
