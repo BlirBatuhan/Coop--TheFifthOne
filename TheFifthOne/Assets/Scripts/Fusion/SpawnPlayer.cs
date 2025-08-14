@@ -21,6 +21,7 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     [SerializeField] public GameObject PlayerPrefab;
     [SerializeField] private SessionListUIhandler sessionListUI;
     [SerializeField] private bool isHost = false; // Host olup olmadýðýný kontrol etmek için
+    [SerializeField] private Transform[] spawnPoints;
 
     // UI References
     [SerializeField] private GameObject lobbyUI;
@@ -216,12 +217,8 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     {
         if (currentGameState == GameState.InGame)
         {
-            // Oyun spawn pozisyonlarý
-            return new Vector3(
-                UnityEngine.Random.Range(-10f, 10f),
-                1f,
-                UnityEngine.Random.Range(-10f, 10f)
-            );
+           var transform  = spawnPoints[player.RawEncoded % spawnPoints.Length];
+            return transform.position;
         }
         else
         {

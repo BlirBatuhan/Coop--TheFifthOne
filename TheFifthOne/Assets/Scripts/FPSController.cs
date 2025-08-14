@@ -28,7 +28,14 @@ public class MyCam : NetworkBehaviour
     private void OyunBasladýmý()
     {
         Debug.Log("oyun baþlandý");
-        DisablePlayerCamera();
+        if(isLocalPlayer)
+        {
+            EnablePlayerCamera();
+        }
+        else
+        {
+            DisablePlayerCamera();
+        }
     }
 
     public override void Spawned()
@@ -49,19 +56,19 @@ public class MyCam : NetworkBehaviour
 
     private void SetupCamera()
     {
-        if (isLocalPlayer)
-        {
-            // Local player - kamerayý aç
-            EnablePlayerCamera();
-            SetMouseLocked(true);
-            Debug.Log("[MyCam] Local player camera enabled");
-        }
-        else
-        {
-            // Remote player - kamerayý kapat
-            DisablePlayerCamera();
-            Debug.Log("[MyCam] Remote player camera disabled");
-        }
+        //if (isLocalPlayer)
+        //{
+        //    // Local player - kamerayý aç
+        //    EnablePlayerCamera();
+        //    SetMouseLocked(true);
+        //    Debug.Log("[MyCam] Local player camera enabled");
+        //}
+        //else
+        //{
+        //    // Remote player - kamerayý kapat
+        //    DisablePlayerCamera();
+        //    Debug.Log("[MyCam] Remote player camera disabled");
+        //}
     }
 
     private void EnablePlayerCamera()

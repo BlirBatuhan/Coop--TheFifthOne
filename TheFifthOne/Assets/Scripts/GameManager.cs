@@ -3,12 +3,14 @@ using Fusion;
 using System.Collections;
 using System.Linq;
 using TMPro;
+using System;
 
 public class GameManager : NetworkBehaviour
 {
        
     public GameObject kup;
     private GameObject Canvas;
+    [SerializeField] private Camera lobbyCamera;
 
 
 
@@ -29,12 +31,18 @@ public class GameManager : NetworkBehaviour
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     public void KameraKapatRpc()
     {
-        Debug.Log("Kamera Kapatýldý");
 
-       foreach(var player in SpawnPlayer.Instance.spawnedCharacters)
+        foreach (var player in SpawnPlayer.Instance.spawnedCharacters)
         {
-          Camera playerCamera = player.Value.GetComponentInChildren<Camera>();
-            playerCamera.GetComponent<MyCam>().oyundaMý = false;
+            if (player.Value == Object.HasStateAuthority)
+            {
+                lobbyCamera.enabled = false;
+                lobbyCamera.GetComponent<AudioListener>().enabled = false;
+
+                Camera playerCamera = player.Value.GetComponentInChildren<Camera>();
+                playerCamera.GetComponent<MyCam>().oyundaMý = false;
+                Debug.Log($"Kamera kapatýldý: {player.Value}");
+            }
         }
     }
 
@@ -51,7 +59,7 @@ public class GameManager : NetworkBehaviour
             {
                 CanvasCýkarRpc();
             }
-            if(Input.GetKey(KeyCode.L))
+            if(Input.GetKeyDown(KeyCode.L))
             {
                 KameraKapatRpc();
             }

@@ -8166,6 +8166,11 @@ MonoBehaviour:
   PlayerPrefab: {fileID: 5009843395614962356, guid: 55cce1a1aec10a74fb69ec1205d56854, type: 3}
   sessionListUI: {fileID: 4940433843375548683}
   isHost: 0
+  spawnPoints:
+  - {fileID: 6803266165578583808, guid: f1692756e696dd640ba3dc463f652ce2, type: 3}
+  - {fileID: 8842608889672026808, guid: 2402642b470d6e345867ba99f0d04251, type: 3}
+  - {fileID: 6801322467659457326, guid: 9824b5c3b9f96ea488ce65a4d6aeea15, type: 3}
+  - {fileID: 1284225076345014763, guid: 277ea38432d99104b931d52806f77c7b, type: 3}
   lobbyUI: {fileID: 5792604533281623682}
   gameUI: {fileID: 6201436856998443317}
   roomUI: {fileID: 1960601268503520290}
