@@ -39,7 +39,14 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
 
     // State
     private GameState currentGameState = GameState.Lobby;
-    private Dictionary<PlayerRef, NetworkObject> spawnedCharacters = new Dictionary<PlayerRef, NetworkObject>();
+    public Dictionary<PlayerRef, NetworkObject> spawnedCharacters = new Dictionary<PlayerRef, NetworkObject>();
+
+    public static SpawnPlayer Instance;
+
+    private void Awake()
+    {
+        Instance = this;
+    }
 
     private async void Start()
     {

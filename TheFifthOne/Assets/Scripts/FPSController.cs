@@ -1,4 +1,5 @@
 using Fusion;
+using System;
 using UnityEngine;
 
 public class MyCam : NetworkBehaviour
@@ -21,6 +22,14 @@ public class MyCam : NetworkBehaviour
     // State
     private bool isLocalPlayer;
     private AudioListener playerAudioListener;
+
+    [Networked, OnChangedRender(nameof(OyunBasladýmý))] public bool oyundaMý { get; set; } = true;
+
+    private void OyunBasladýmý()
+    {
+        Debug.Log("oyun baþlandý");
+        DisablePlayerCamera();
+    }
 
     public override void Spawned()
     {
@@ -66,7 +75,7 @@ public class MyCam : NetworkBehaviour
         }
     }
 
-    private void DisablePlayerCamera()
+    public void DisablePlayerCamera()
     {
         if (playerCamera != null)
         {

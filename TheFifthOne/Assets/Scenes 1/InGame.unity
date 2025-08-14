@@ -6578,14 +6578,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 79154580baf6d4544ab461b2569021c3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _IsGameActive: 0
-  _GameStartTime: 0
-  _ConnectedPlayers: 0
-  countdownDuration: 5
-  minPlayersToStart: 2
-  maxPlayers: 4
-  playerSpawnPoints: []
-  defaultSpawnPosition: {x: 0, y: 0, z: 0}
+  kup: {fileID: 1691887539443415228, guid: 68ebf3e4a4eb73643b54dcd57da246cb, type: 3}
 --- !u!4 &1911916842
 Transform:
   m_ObjectHideFlags: 0
