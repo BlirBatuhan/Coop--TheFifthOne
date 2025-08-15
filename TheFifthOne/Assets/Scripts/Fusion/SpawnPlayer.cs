@@ -22,6 +22,8 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     [SerializeField] private SessionListUIhandler sessionListUI;
     [SerializeField] private bool isHost = false; // Host olup olmadığını kontrol etmek için
     [SerializeField] private Transform[] spawnPoints;
+    public GameObject[] Karakterler;
+    public int Number;
 
     // UI References
     [SerializeField] private GameObject lobbyUI;
@@ -52,9 +54,48 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     private async void Start()
     {
         DontDestroyOnLoad(this.gameObject);
+
+        // Kaydedilmiş karakter seçimini yükle
+        int savedCharacterIndex = PlayerPrefs.GetInt("SelectedCharacterIndex", 0);
+        Number = savedCharacterIndex;
+
+        // Lobby'de doğru karakteri göster
+        if (Karakterler != null && Karakterler.Length > 0)
+        {
+            for (int i = 0; i < Karakterler.Length; i++)
+            {
+                Karakterler[i].SetActive(i == Number);
+            }
+        }
+
         SetGameState(GameState.Lobby);
         await StartSessionDiscovery();
     }
+
+    public void ChangeCharacter(int karakterIndex)
+    {
+        for (int i = 0; i < Karakterler.Length; i++)
+        {
+            Karakterler[i].SetActive(false);
+        }
+
+        Number += karakterIndex;
+
+        if (Number >= Karakterler.Length - 1)
+        {
+            Number = 0;
+        }
+        else if (Number < 0)
+        {
+            Number = Karakterler.Length - 1;
+        }
+
+        Karakterler[Number].SetActive(true);
+        string karakterAdi = Karakterler[Number].name;
+        PlayerPrefs.SetString("SelectedCharacter", karakterAdi);
+    }
+
+
 
     private void SetGameState(GameState newState)
     {
@@ -199,6 +240,7 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
 
         Vector3 spawnPos = GetSpawnPosition(player);
 
+        // Player prefabını spawn et
         NetworkObject networkObject = runner.Spawn(
             PlayerPrefab,
             spawnPos,
@@ -209,8 +251,35 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         if (networkObject != null)
         {
             spawnedCharacters[player] = networkObject;
+
+            // Sadece kendi karakterimiz için model seçimini uygula
+            if (player == runner.LocalPlayer)
+            {
+                // Seçilen karakter modelini aktif et
+                SetActiveCharacterModel(networkObject.gameObject);
+            }
+
             Debug.Log($"Player spawned: {player}");
         }
+    }
+
+    private void SetActiveCharacterModel(GameObject playerObject)
+    {
+        // Seçilen karakter index'ini al
+        string selectedCharacterIndex = PlayerPrefs.GetString("SelectedCharacter");
+
+       for(int i = 0; i < playerObject.transform.childCount; i++)
+        {
+            Transform child = playerObject.transform.GetChild(i);
+            if(child.name == "Root")
+            {
+                continue;
+            }
+            child.gameObject.SetActive(child.name == selectedCharacterIndex );
+            
+        }
+
+        
     }
 
     private Vector3 GetSpawnPosition(PlayerRef player)
