@@ -5995,7 +5995,7 @@ GameObject:
   - component: {fileID: 4819824774185748813}
   - component: {fileID: 4819824774172518257}
   m_Layer: 0
-  m_Name: Character_Viking
+  m_Name: Viking
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -6044,7 +6044,7 @@ GameObject:
   - component: {fileID: 4819824774185835169}
   - component: {fileID: 4819824774172526661}
   m_Layer: 0
-  m_Name: Character_Knight
+  m_Name: Knight
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -6141,7 +6141,7 @@ GameObject:
   - component: {fileID: 4819824774185749883}
   - component: {fileID: 4819824774172451491}
   m_Layer: 0
-  m_Name: Character_Peasant
+  m_Name: Peasant
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -6532,7 +6532,7 @@ GameObject:
   - component: {fileID: 4819824774185856257}
   - component: {fileID: 4819824774172464081}
   m_Layer: 0
-  m_Name: Character_Warrior
+  m_Name: Warrior
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -6691,7 +6691,7 @@ GameObject:
   - component: {fileID: 4819824774185804229}
   - component: {fileID: 4819824774172454313}
   m_Layer: 0
-  m_Name: Character_Shopkeeper
+  m_Name: Shopkeeper
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

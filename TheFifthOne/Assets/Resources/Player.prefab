@@ -291,7 +291,7 @@ GameObject:
   - component: {fileID: 6479157847075957279}
   - component: {fileID: 940064905862163634}
   m_Layer: 0
-  m_Name: Character_Viking
+  m_Name: Viking
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5627,7 +5627,7 @@ GameObject:
   - component: {fileID: 3962575797154681824}
   - component: {fileID: 7757022582189790518}
   m_Layer: 0
-  m_Name: Character_Warrior
+  m_Name: Warrior
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -6421,7 +6421,7 @@ GameObject:
   - component: {fileID: 7904308867268950713}
   - component: {fileID: 6515243952995438372}
   m_Layer: 0
-  m_Name: Character_Knight
+  m_Name: Knight
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -6976,7 +6976,7 @@ GameObject:
   - component: {fileID: 3638402261339221456}
   - component: {fileID: 2282980232870407359}
   m_Layer: 0
-  m_Name: Character_Peasant
+  m_Name: Peasant
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -7217,6 +7217,7 @@ MonoBehaviour:
   kosmaHiz: 6
   airControl: 0.5
   ziplamaSiniri: 4
+  _SelectedCharacterName: 
   _IsWaiting: 1
 --- !u!136 &9166354401258392284
 CapsuleCollider:
@@ -12679,7 +12680,7 @@ GameObject:
   - component: {fileID: 822790053770062263}
   - component: {fileID: 4835652900677731943}
   m_Layer: 0
-  m_Name: Character_Shopkeeper
+  m_Name: Shopkeeper
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

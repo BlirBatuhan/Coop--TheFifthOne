@@ -1,6 +1,7 @@
 using Fusion;
 using UnityEngine;
 using Kutuphanem;
+using WebSocketSharp;
 
 public class Hareket : NetworkBehaviour
 {
@@ -22,6 +23,7 @@ public class Hareket : NetworkBehaviour
 
 
     private bool isGrounded;
+    [Networked] public string SelectedCharacterName { get; set; }
     [Networked] public bool IsWaiting { get; set; } = true;
     [Networked] private Vector2 input { get; set; }
     [Networked] private bool isRunning { get; set; }
@@ -33,8 +35,32 @@ public class Hareket : NetworkBehaviour
     {
         rb = GetComponent<Rigidbody>();
         anim = GetComponent<Animator>();
+        if(HasInputAuthority)
+        {
+            string selectedCharacter = PlayerPrefs.GetString("SelectedCharacter");
+            if (!string.IsNullOrEmpty(selectedCharacter))
+            {
+                SelectedCharacterName = selectedCharacter;
+            }
+        }
+        Invoke(nameof(UpdateCharacterModel), 0.3f);
+    }
 
-        
+
+    private void UpdateCharacterModel()
+    {
+        if (string.IsNullOrEmpty(SelectedCharacterName)) return;
+        Debug.Log(SelectedCharacterName);
+
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            Transform child = transform.GetChild(i);
+            if (child.name == "Root")
+            {
+                continue;
+            }
+            child.gameObject.SetActive(child.name == SelectedCharacterName);
+        } 
     }
 
     public override void FixedUpdateNetwork()

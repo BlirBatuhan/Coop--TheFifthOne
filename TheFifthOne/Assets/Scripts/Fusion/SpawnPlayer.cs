@@ -55,18 +55,6 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     {
         DontDestroyOnLoad(this.gameObject);
 
-        // Kaydedilmiþ karakter seçimini yükle
-        int savedCharacterIndex = PlayerPrefs.GetInt("SelectedCharacterIndex", 0);
-        Number = savedCharacterIndex;
-
-        // Lobby'de doðru karakteri göster
-        if (Karakterler != null && Karakterler.Length > 0)
-        {
-            for (int i = 0; i < Karakterler.Length; i++)
-            {
-                Karakterler[i].SetActive(i == Number);
-            }
-        }
 
         SetGameState(GameState.Lobby);
         await StartSessionDiscovery();
@@ -81,18 +69,19 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
 
         Number += karakterIndex;
 
-        if (Number >= Karakterler.Length - 1)
+        if (Number >= Karakterler.Length )
         {
             Number = 0;
         }
         else if (Number < 0)
         {
-            Number = Karakterler.Length - 1;
+            Number = Karakterler.Length;
         }
 
         Karakterler[Number].SetActive(true);
         string karakterAdi = Karakterler[Number].name;
         PlayerPrefs.SetString("SelectedCharacter", karakterAdi);
+        Debug.Log($"Selected character: {karakterAdi}");
     }
 
 
@@ -255,8 +244,15 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
             // Sadece kendi karakterimiz için model seçimini uygula
             if (player == runner.LocalPlayer)
             {
-                // Seçilen karakter modelini aktif et
-                SetActiveCharacterModel(networkObject.gameObject);
+                var playerController = networkObject.GetComponent<Hareket>();
+                if (playerController != null && playerController.HasStateAuthority)
+                {
+                    string selectedCharacter = PlayerPrefs.GetString("SelectedCharacter");
+                    if (!string.IsNullOrEmpty(selectedCharacter))
+                    {
+                        playerController.SelectedCharacterName = selectedCharacter;
+                    }
+                }
             }
 
             Debug.Log($"Player spawned: {player}");
