@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -12,6 +13,8 @@ public class MonsterAI : MonoBehaviour
     public Transform eyePoint;
     public LayerMask playerMask;
     public LayerMask obstacleMask;
+    float[] blendValues = { 0f, 0.25f, 0.5f, 0.75f, 1f };
+    private float currentSpeed = 0f;
 
     [Header("Takip ve Saldýrý")]
     public float attackDistance = 2f;
@@ -21,11 +24,14 @@ public class MonsterAI : MonoBehaviour
     private Transform targetPlayer;
     private Animator anim;
 
+    
+
+
     void Start()
     {
         anim = GetComponent<Animator>();
         agent = GetComponent<NavMeshAgent>();
-       
+        currentSpeed = agent.speed;
     }
 
     void Update()
@@ -42,6 +48,7 @@ public class MonsterAI : MonoBehaviour
                 AttackPlayer();
                 break;
         }
+        
     }
 
     void SearchForPlayer()
@@ -84,14 +91,29 @@ public class MonsterAI : MonoBehaviour
         }
 
         Debug.Log("Takip ediliyor.");
-        anim.SetFloat("speed", 0.2f);
+        
         agent.SetDestination(targetPlayer.position);
 
         float distance = Vector3.Distance(transform.position, targetPlayer.position);
 
         if(distance <= detectionRadius/2)
         {
-            anim.SetFloat("speed", 0.5f);
+            if (gameObject.name == "Zombie")
+            {
+                anim.SetFloat("speed", Mathf.Lerp(anim.GetFloat("speed"), 0.5f, Time.deltaTime * 1f));
+                agent.speed = 0.7f;
+            }
+            else
+            {
+                agent.speed = 1.5f; // Hýz arttýrýlýyor
+                anim.SetFloat("speed", Mathf.Lerp(anim.GetFloat("speed"), 1f, Time.deltaTime * 2f));
+            }
+            
+        }
+        else
+        {
+            anim.SetFloat("speed", Mathf.Lerp(anim.GetFloat("speed"), 0.2f, Time.deltaTime * 1f));
+            agent.speed = currentSpeed; // Normal hýza dön
         }
 
         if (distance <= attackDistance)
@@ -120,6 +142,7 @@ public class MonsterAI : MonoBehaviour
         }
 
         anim.SetFloat("speed", 0);
+        anim.SetBool("attack", true);
         
         Vector3 lookDirection = targetPlayer.position - transform.position;
         lookDirection.y = 0; // canavarin geriye yatmasi engellendi
@@ -135,10 +158,20 @@ public class MonsterAI : MonoBehaviour
         if (distance > attackDistance)
         {
             currentState = AIState.Chase;
+            anim.SetBool("attack", false);
         }
     }
 
-    private void OnDrawGizmos()
+    public void ChangeRandomAttack()
+    {
+        int randomIndex = Random.Range(0, blendValues.Length);
+        float randomBlend = blendValues[randomIndex];
+        anim.SetFloat("rand", randomBlend);
+        Debug.Log($"Animation Event - Yeni rastgele deðer: {randomBlend}");
+    }
+
+
+        private void OnDrawGizmos()
     {
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackDistance);
