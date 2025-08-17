@@ -60,7 +60,14 @@ public class Hareket : NetworkBehaviour
                 continue;
             }
             child.gameObject.SetActive(child.name == SelectedCharacterName);
-        } 
+        }  
+    }
+
+    [Rpc(RpcSources.InputAuthority, RpcTargets.All)]
+    private void AttackRPC()
+    {
+        Debug.Log("Attack RPC received!");
+        anim.SetTrigger("attack");
     }
 
     public override void FixedUpdateNetwork()
@@ -74,6 +81,11 @@ public class Hareket : NetworkBehaviour
                 isRunning = data.run;
                 isCrouching = data.crouch;
                 isJumping = data.jump;
+
+                if(data.attack)
+                {
+                    AttackRPC();
+                }
 
                 // Animasyon güncelle
                 animasyon.Sol_Hareket(anim, "solHareket", animasyon.ParamtereOlustur(Sol_Yon_Parametreleri), data);

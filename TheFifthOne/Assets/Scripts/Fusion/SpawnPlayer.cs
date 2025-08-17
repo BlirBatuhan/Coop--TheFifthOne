@@ -24,6 +24,8 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
     [SerializeField] private Transform[] spawnPoints;
     public GameObject[] Karakterler;
     public int Number;
+    private bool attackBuffer = false;
+    private bool jumpBuffer = false;
 
     // UI References
     [SerializeField] private GameObject lobbyUI;
@@ -58,6 +60,18 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
 
         SetGameState(GameState.Lobby);
         await StartSessionDiscovery();
+    }
+
+    void Update()
+    {
+        if (Input.GetMouseButtonDown(0))
+        {
+            attackBuffer = true;
+        }
+        if(Input.GetButtonDown("Jump"))
+        {
+            jumpBuffer = true;
+        }
     }
 
     public void ChangeCharacter(int karakterIndex)
@@ -350,11 +364,14 @@ public class SpawnPlayer : MonoBehaviour, INetworkRunnerCallbacks
         NetworkInputData data = new NetworkInputData
         {
             move = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")),
-            jump = Input.GetButtonDown("Jump"),
+            jump = jumpBuffer,
             crouch = Input.GetKey(KeyCode.LeftControl),
             run = Input.GetKey(KeyCode.LeftShift),
+            attack = attackBuffer
         };
         input.Set(data);
+        attackBuffer = false;
+        jumpBuffer = false;
     }
 
     private void UpdateRoomUI()

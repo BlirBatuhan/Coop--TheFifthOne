@@ -31,6 +31,7 @@ public class MyCam : NetworkBehaviour
         if(isLocalPlayer)
         {
             EnablePlayerCamera();
+            SetMouseLocked(true);
         }
         else
         {

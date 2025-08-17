@@ -23,12 +23,13 @@ public class MonsterAI : MonoBehaviour
     private NavMeshAgent agent;
     private Transform targetPlayer;
     private Animator anim;
-
+    private WeaponHitbox WeaponHit;
     
 
 
     void Start()
     {
+        WeaponHit =  GetComponentInChildren<WeaponHitbox>();
         anim = GetComponent<Animator>();
         agent = GetComponent<NavMeshAgent>();
         currentSpeed = agent.speed;
@@ -48,7 +49,13 @@ public class MonsterAI : MonoBehaviour
                 AttackPlayer();
                 break;
         }
-        
+        if (targetPlayer == null)
+        {
+            anim.SetBool("attack", false);
+            Debug.LogWarning("Hedef oyuncu bulunamadý, saldýrý gerçekleþtirilemiyor.");
+            return;
+        }
+
     }
 
     void SearchForPlayer()
@@ -59,7 +66,8 @@ public class MonsterAI : MonoBehaviour
         foreach (Collider target in targets)
         {
             //göz pozisyonuyla hedef arasýndaki yönü hesapla
-            Vector3 dirToTarget = (target.transform.position - eyePoint.position).normalized;
+            Vector3 targetPoint = target.transform.position + Vector3.up * 1.5f;
+            Vector3 dirToTarget = (targetPoint - eyePoint.position).normalized;
             // Hedefe olan açýyý kontrol et
             float angle = Vector3.Angle(eyePoint.forward, dirToTarget);
 
@@ -112,7 +120,7 @@ public class MonsterAI : MonoBehaviour
         }
         else
         {
-            anim.SetFloat("speed", Mathf.Lerp(anim.GetFloat("speed"), 0.2f, Time.deltaTime * 1f));
+            anim.SetFloat("speed", Mathf.Lerp(anim.GetFloat("speed"), 0.2f, Time.deltaTime * 5f));
             agent.speed = currentSpeed; // Normal hýza dön
         }
 
@@ -167,11 +175,12 @@ public class MonsterAI : MonoBehaviour
         int randomIndex = Random.Range(0, blendValues.Length);
         float randomBlend = blendValues[randomIndex];
         anim.SetFloat("rand", randomBlend);
+        WeaponHit.DeactivateHitbox(); // Önce hitbox'u devre dýþý býrak
         Debug.Log($"Animation Event - Yeni rastgele deðer: {randomBlend}");
     }
 
 
-        private void OnDrawGizmos()
+    private void OnDrawGizmos()
     {
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackDistance);

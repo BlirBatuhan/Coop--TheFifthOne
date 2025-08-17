@@ -34,15 +34,15 @@ public class GameManager : NetworkBehaviour
 
         foreach (var player in SpawnPlayer.Instance.spawnedCharacters)
         {
-            if (player.Value == Object.HasStateAuthority)
-            {
+            
+            
                 lobbyCamera.enabled = false;
                 lobbyCamera.GetComponent<AudioListener>().enabled = false;
 
                 Camera playerCamera = player.Value.GetComponentInChildren<Camera>();
                 playerCamera.GetComponent<MyCam>().oyundaMý = false;
                 Debug.Log($"Kamera kapatýldý: {player.Value}");
-            }
+            
         }
     }
 
