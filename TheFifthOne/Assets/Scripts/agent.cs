@@ -11,6 +11,7 @@ public class MonsterAI : MonoBehaviour
     public float detectionRadius = 10f;
     public float viewAngle = 90f;
     public Transform eyePoint;
+    public Transform attackPoint;
     public LayerMask playerMask;
     public LayerMask obstacleMask;
     float[] blendValues = { 0f, 0.25f, 0.5f, 0.75f, 1f };
@@ -18,18 +19,20 @@ public class MonsterAI : MonoBehaviour
 
     [Header("Takip ve Saldýrý")]
     public float attackDistance = 2f;
-    
+
+    [Header("Effects")]
+    public GameObject bloodEffect;
+    public GameObject kickEffect;
 
     private NavMeshAgent agent;
     private Transform targetPlayer;
     private Animator anim;
-    private WeaponHitbox WeaponHit;
+    
     
 
 
     void Start()
     {
-        WeaponHit =  GetComponentInChildren<WeaponHitbox>();
         anim = GetComponent<Animator>();
         agent = GetComponent<NavMeshAgent>();
         currentSpeed = agent.speed;
@@ -55,7 +58,6 @@ public class MonsterAI : MonoBehaviour
             Debug.LogWarning("Hedef oyuncu bulunamadý, saldýrý gerçekleþtirilemiyor.");
             return;
         }
-
     }
 
     void SearchForPlayer()
@@ -175,8 +177,37 @@ public class MonsterAI : MonoBehaviour
         int randomIndex = Random.Range(0, blendValues.Length);
         float randomBlend = blendValues[randomIndex];
         anim.SetFloat("rand", randomBlend);
-        WeaponHit.DeactivateHitbox(); // Önce hitbox'u devre dýþý býrak
         Debug.Log($"Animation Event - Yeni rastgele deðer: {randomBlend}");
+    }
+
+    public void AttackHit()
+    {
+        Collider[] hitEnemies = Physics.OverlapSphere(attackPoint.position, attackDistance, playerMask);
+
+        foreach (Collider enemy in hitEnemies)
+        {
+            
+            enemy.GetComponent<CharacterHealth>().TakeDamage(5);
+            if (anim.GetFloat("rand") == 0.75f || anim.GetFloat("rand") == 1f)
+            {
+                enemy.GetComponent<Animator>().applyRootMotion = false; // Animasyon kök hareketini devre dýþý býrak
+                Rigidbody rb = enemy.GetComponent<Rigidbody>();
+                kickEffect.SetActive(true);
+                if (rb != null)
+                {
+                    
+                    Vector3 knockbackDir = (enemy.transform.position - transform.position).normalized;
+                    knockbackDir.y = 0; // Yukarý zýplamasýn
+                    rb.AddForce(knockbackDir * 5f, ForceMode.Impulse);
+                    
+                }
+                //enemy.GetComponent<Animator>().applyRootMotion = true; // Animasyon kök hareketini devre dýþý býrak
+            }
+            else
+            {
+                bloodEffect.SetActive(true);
+            }
+        }
     }
 
 
@@ -187,6 +218,9 @@ public class MonsterAI : MonoBehaviour
 
         Gizmos.color = Color.green;
         Gizmos.DrawWireSphere(transform.position, detectionRadius);
+
+        Gizmos.color = Color.black;
+        Gizmos.DrawWireSphere(attackPoint.position, attackDistance);
 
         // Görüþ açýsýný göster
         if (eyePoint != null)

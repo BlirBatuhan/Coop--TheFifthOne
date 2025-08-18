@@ -3,7 +3,8 @@ using UnityEngine;
 
 public class CharacterHealth : MonoBehaviour
 {
-    [Networked] public float Health { get; set; } = 100f;
+     public float Health = 100f;
+    
 
     public void TakeDamage(float damage)
     {
