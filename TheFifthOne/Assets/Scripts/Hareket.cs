@@ -2,6 +2,7 @@ using Fusion;
 using UnityEngine;
 using Kutuphanem;
 using WebSocketSharp;
+using System.Collections;
 
 public class Hareket : NetworkBehaviour
 {
@@ -21,7 +22,7 @@ public class Hareket : NetworkBehaviour
     float[] Sag_Yon_Parametreleri = { 0.15f, 0.5f, 1 };
     float[] Egilme_Yon_Parametreleri = { 0.15f, 0.25f, 0.50f, 0.75f, 1f };
 
-
+    private bool skipVelocityOverride = false;
     private bool isGrounded;
     [Networked] public string SelectedCharacterName { get; set; }
     [Networked] public bool IsWaiting { get; set; } = true;
@@ -29,6 +30,7 @@ public class Hareket : NetworkBehaviour
     [Networked] private bool isRunning { get; set; }
     [Networked] private bool isJumping { get; set; }
     [Networked] private bool isCrouching { get; set; }
+    [Networked] private Vector3 externalForce { get; set; }
 
 
     public override void Spawned()
@@ -62,6 +64,11 @@ public class Hareket : NetworkBehaviour
             child.gameObject.SetActive(child.name == SelectedCharacterName);
         }  
     }
+    private IEnumerator ResetVelocityOverride(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        skipVelocityOverride = false;
+    }
 
     [Rpc(RpcSources.InputAuthority, RpcTargets.All)]
     private void AttackRPC()
@@ -70,6 +77,12 @@ public class Hareket : NetworkBehaviour
         anim.SetTrigger("attack");
     }
 
+
+    [Rpc(RpcSources.All, RpcTargets.All)]
+    public void ApplyExternalForceRPC(Vector3 kuvvet)
+    {
+        externalForce = kuvvet;
+    }
     public override void FixedUpdateNetwork()
     {
         // Eðer bu client input otoritesine sahipse hareket ve input iþleme
@@ -86,6 +99,13 @@ public class Hareket : NetworkBehaviour
                 {
                     AttackRPC();
                 }
+                if (externalForce.magnitude > 0f)
+                {
+                    skipVelocityOverride = true; // kýsa süreli override’ý durdur
+                    rb.AddForce(externalForce, ForceMode.Impulse);
+                    externalForce = Vector3.zero;
+                    StartCoroutine(ResetVelocityOverride(0.2f)); // 0.2 saniye sonra normal hareket devam eder
+                }
 
                 // Animasyon güncelle
                 animasyon.Sol_Hareket(anim, "solHareket", animasyon.ParamtereOlustur(Sol_Yon_Parametreleri), data);
@@ -93,10 +113,11 @@ public class Hareket : NetworkBehaviour
                 animasyon.Geri_Hareket(anim, "geri", data);
                 animasyon.Egilme_Hareket(anim, "egilmeHareket", animasyon.ParamtereOlustur(Egilme_Yon_Parametreleri), data);
 
+        if (!skipVelocityOverride) {
                 if (data.move.y > 0.1f)
                 {
                     float hiz = isCrouching ? 0.1f : (isRunning ? 1f : 0.2f);
-                    anim.SetFloat("speed", Mathf.Lerp(anim.GetFloat("speed"), hiz, Time.deltaTime * 10f));
+                    anim.SetFloat("speed", Mathf.Lerp(anim.GetFloat("speed"), hiz, Time.fixedDeltaTime * 10f));
                 }
                 else
                 {
@@ -130,6 +151,7 @@ public class Hareket : NetworkBehaviour
 
                 isJumping = false;
                 isGrounded = false;
+                }
 
             }
 

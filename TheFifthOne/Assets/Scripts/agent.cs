@@ -190,18 +190,9 @@ public class MonsterAI : MonoBehaviour
             enemy.GetComponent<CharacterHealth>().TakeDamage(5);
             if (anim.GetFloat("rand") == 0.75f || anim.GetFloat("rand") == 1f)
             {
+                Vector3 kuvvetVector = (enemy.transform.position - transform.position).normalized * 15f;
                 enemy.GetComponent<Animator>().applyRootMotion = false; // Animasyon kök hareketini devre dýþý býrak
-                Rigidbody rb = enemy.GetComponent<Rigidbody>();
-                kickEffect.SetActive(true);
-                if (rb != null)
-                {
-                    
-                    Vector3 knockbackDir = (enemy.transform.position - transform.position).normalized;
-                    knockbackDir.y = 0; // Yukarý zýplamasýn
-                    rb.AddForce(knockbackDir * 5f, ForceMode.Impulse);
-                    
-                }
-                //enemy.GetComponent<Animator>().applyRootMotion = true; // Animasyon kök hareketini devre dýþý býrak
+                enemy.GetComponent<Hareket>().ApplyExternalForceRPC(kuvvetVector);
             }
             else
             {
