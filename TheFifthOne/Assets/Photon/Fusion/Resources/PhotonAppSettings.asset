@@ -1,30 +1,3 @@
-%YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
---- !u!114 &11400000
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 1878438611, guid: 7de3b8b9e1263ad479e2d0c4261b7646, type: 3}
-  m_Name: PhotonAppSettings
-  m_EditorClassIdentifier: 
-  AppSettings:
-    AppIdFusion: 0a79d95e-7bbf-4c72-882a-80468e39177e
-    AppIdChat: 
-    AppIdVoice: e64165d6-845a-43c3-902e-3f41ab220341
-    AppVersion: 
-    UseNameServer: 1
-    FixedRegion: 
-    Server: 
-    Port: 0
-    ProxyServer: 
-    Protocol: 0
-    EnableProtocolFallback: 1
-    AuthMode: 0
-    EnableLobbyStatistics: 0
-    encryptionMode: 0
-    emptyRoomTtl: 0
+version https://git-lfs.github.com/spec/v1
+oid sha256:8e42e29c8d22aa9e2ff65edc2421152cea924f8620ddc31822db935d38ce85d7
+size 778

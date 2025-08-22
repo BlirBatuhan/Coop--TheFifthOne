@@ -1,17 +1,3 @@
-%YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
---- !u!114 &11400000
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 907fb082d5960e6418ee5c85da341104, type: 3}
-  m_Name: FunkyAnimation
-  m_EditorClassIdentifier: 
-  speed: 3.5
-  squeezeFactor: 0.4
-  amplitude: 10
+version https://git-lfs.github.com/spec/v1
+oid sha256:26d157c8cbb703ad67a6acdc4fae6e1f9744cdfb33086d6a7cbf29fb0f43bb8e
+size 470
