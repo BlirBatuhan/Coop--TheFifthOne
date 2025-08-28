@@ -1,22 +1,3 @@
-Skip to content
- 
-Search Gists
-Search...
-All gists
-Back to GitHub
-@orkunhacilar
-orkunhacilar/.gitattributes
-Created 2 years ago • Report abuse
-Code
-Revisions
-1
-Stars
-3
-Forks
-Clone this repository at &lt;script src=&quot;https://gist.github.com/orkunhacilar/1530fcc72bf892eb195ada55fd01781c.js&quot;&gt;&lt;/script&gt;
-<script src="https://gist.github.com/orkunhacilar/1530fcc72bf892eb195ada55fd01781c.js"></script>
-.gitattributes for Unity3D with git-lfs example 2
-.gitattributes
 * text=auto
 
 # Unity files
@@ -87,30 +68,16 @@ Clone this repository at &lt;script src=&quot;https://gist.github.com/orkunhacil
 *.lwo2 filter=lfs diff=lfs merge=lfs -text
 *.abc filter=lfs diff=lfs merge=lfs -text
 *.3dm filter=lfs diff=lfs merge=lfs -text
-# Build
+# Build files
 *.dll filter=lfs diff=lfs merge=lfs -text
 *.pdb filter=lfs diff=lfs merge=lfs -text
 *.mdb filter=lfs diff=lfs merge=lfs -text
-# Packaging
+# Archives
 *.zip filter=lfs diff=lfs merge=lfs -text
 *.7z filter=lfs diff=lfs merge=lfs -text
 *.gz filter=lfs diff=lfs merge=lfs -text
 *.rar filter=lfs diff=lfs merge=lfs -text
 *.tar filter=lfs diff=lfs merge=lfs -text
-@BlirBatuhan
-Comment
-Leave a comment
-Footer
-© 2025 GitHub, Inc.
-Footer navigation
-Terms
-Privacy
-Security
-Status
-Docs
-Contact
-Manage cookies
-Do not share my personal information
 *.prefab filter=lfs diff=lfs merge=lfs -text
 *.unity filter=lfs diff=lfs merge=lfs -text
 *.mat filter=lfs diff=lfs merge=lfs -text
