@@ -1,6 +1,5 @@
 # =========================
 # Unity + Git LFS ayarları
-
 # Görseller
 *.psd filter=lfs diff=lfs merge=lfs -text
 *.png filter=lfs diff=lfs merge=lfs -text
@@ -41,3 +40,4 @@
 *.a filter=lfs diff=lfs merge=lfs -text
 *.so filter=lfs diff=lfs merge=lfs -text
 *.dylib filter=lfs diff=lfs merge=lfs -text
+TheFifthOne/Assets/Scenes[[:space:]]1/InGame/LightingData.asset filter=lfs diff=lfs merge=lfs -text
